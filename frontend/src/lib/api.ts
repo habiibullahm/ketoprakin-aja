@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? (
+  import.meta.env.DEV ? 'http://localhost:3000/api' : '/api'
+);
 
 // Helper function to get token from localStorage
 const getToken = (): string | null => {
@@ -62,10 +64,16 @@ export const authApi = {
     setToken(response.token);
     return response;
   },
+  me: () => apiRequest<{ id: number; name: string; email: string; role: string }>("/auth/me"),
 
   logout: () => {
     removeToken();
   },
+};
+
+export const customerApi = {
+  orders: () => apiRequest<any[]>("/customer/orders"),
+  loyalty: () => apiRequest<{ stamps: number; remaining: number; rewardAvailable: boolean }>("/customer/loyalty"),
 };
 
 // Menu API
@@ -129,6 +137,8 @@ export const ordersApi = {
 // Expenses API
 export const expensesApi = {
   getAll: () => apiRequest<any[]>('/expenses'),
+
+  getToday: () => apiRequest<any[]>('/expenses/today'),
 
   getById: (id: number) => apiRequest<any>(`/expenses/${id}`),
 

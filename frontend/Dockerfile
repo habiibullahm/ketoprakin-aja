@@ -8,7 +8,7 @@ COPY tsconfig*.json ./
 COPY vite.config.ts ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install --package-lock=false
 
 # Copy source code
 COPY . .

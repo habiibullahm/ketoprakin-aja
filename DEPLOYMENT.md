@@ -40,12 +40,10 @@ docker-compose logs -f
 
 ### 3. Initialize Database
 
-```bash
-# Run database migrations
-docker-compose exec backend npm run db:push
+The `db-init` service automatically creates the schema and demo merchant before the API starts. Check it with:
 
-# Seed initial data (optional)
-docker-compose exec backend npm run seed
+```bash
+docker compose logs db-init
 ```
 
 ### 4. Access the Application

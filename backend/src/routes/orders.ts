@@ -1,9 +1,9 @@
 import { Hono } from "hono"
 import { db } from "../db"
-import { orders, orderItems, menuItems } from "../db/schema"
-import { eq, desc, and, gte, lte } from "drizzle-orm"
+import { orders, orderItems, menuItems, loyaltyStamps } from "../db/schema"
+import { eq, desc, ne } from "drizzle-orm"
 import { z } from "zod"
-import { authMiddleware } from "../middleware/auth"
+import { authMiddleware, merchantMiddleware } from "../middleware/auth"
 import { getIo } from "../lib/socket"
 
 const orderRoutes = new Hono()
@@ -35,7 +35,7 @@ const generateOrderNumber = () => {
 }
 
 // Get all orders (protected)
-orderRoutes.get("/", authMiddleware, async (c) => {
+orderRoutes.get("/", merchantMiddleware, async (c) => {
   try {
     const allOrders = await db.query.orders.findMany({
       orderBy: [desc(orders.createdAt)],
@@ -54,10 +54,10 @@ orderRoutes.get("/", authMiddleware, async (c) => {
 })
 
 // Get active orders (protected)
-orderRoutes.get("/active", authMiddleware, async (c) => {
+orderRoutes.get("/active", merchantMiddleware, async (c) => {
   try {
     const activeOrders = await db.query.orders.findMany({
-      where: (orders, { ne }) => ne(orders.status, "selesai"),
+      where: ne(orders.status, "selesai"),
       orderBy: [desc(orders.createdAt)],
       with: {
         orderItems: {
@@ -73,8 +73,8 @@ orderRoutes.get("/active", authMiddleware, async (c) => {
   }
 })
 
-// Get single order (protected)
-orderRoutes.get("/:id", authMiddleware, async (c) => {
+// Customers need to track their own order without merchant authentication.
+orderRoutes.get("/:id", async (c) => {
   try {
     const idParam = c.req.param("id")
     if (!idParam) {
@@ -103,10 +103,12 @@ orderRoutes.get("/:id", authMiddleware, async (c) => {
 })
 
 // Create order
-orderRoutes.post("/", async (c) => {
+orderRoutes.post("/", authMiddleware, async (c) => {
   try {
     const body = await c.req.json()
     const validated = createOrderSchema.parse(body)
+    const user = (c as any).get("user") as { id: number; role: string; name: string }
+    if (user.role !== "customer") return c.json({ error: "Customer account required" }, 403)
 
     // Calculate total and prepare order items
     let totalAmount = 0
@@ -143,6 +145,7 @@ orderRoutes.post("/", async (c) => {
       .values({
         orderNumber,
         customerName: validated.customerName,
+        userId: user.id,
         customerPhone: validated.customerPhone,
         orderType: validated.orderType,
         totalAmount: totalAmount.toString(),
@@ -162,7 +165,7 @@ orderRoutes.post("/", async (c) => {
 
     // Emit socket event for real-time KDS update
     const io = getIo()
-    io.emit("new-order", {
+    io.to("kitchen").emit("new-order", {
       orderId: newOrder.id,
       orderNumber: newOrder.orderNumber,
       customerName: newOrder.customerName,
@@ -195,7 +198,7 @@ orderRoutes.post("/", async (c) => {
 })
 
 // Update order status (protected)
-orderRoutes.patch("/:id/status", authMiddleware, async (c) => {
+orderRoutes.patch("/:id/status", merchantMiddleware, async (c) => {
   try {
     const idParam = c.req.param("id")
     if (!idParam) {
@@ -224,11 +227,13 @@ orderRoutes.patch("/:id/status", authMiddleware, async (c) => {
 
     // Emit socket event for real-time KDS update
     const io = getIo()
-    io.emit("order-status-update", {
+    const statusUpdate = {
       orderId: updated.id,
       orderNumber: updated.orderNumber,
       status: updated.status,
-    })
+    }
+    io.to("kitchen").emit("order-status-update", statusUpdate)
+    io.to(`order:${updated.id}`).emit("order-status-update", statusUpdate)
 
     return c.json(updated)
   } catch (error) {
@@ -237,7 +242,7 @@ orderRoutes.patch("/:id/status", authMiddleware, async (c) => {
 })
 
 // Update payment status (protected)
-orderRoutes.patch("/:id/payment", authMiddleware, async (c) => {
+orderRoutes.patch("/:id/payment", merchantMiddleware, async (c) => {
   try {
     const idParam = c.req.param("id")
     if (!idParam) {
@@ -262,6 +267,10 @@ orderRoutes.patch("/:id/payment", authMiddleware, async (c) => {
 
     if (!updated) {
       return c.json({ error: "Order not found" }, 404)
+    }
+
+    if (updated.paymentStatus === "paid" && updated.userId) {
+      await db.insert(loyaltyStamps).values({ userId: updated.userId, orderId: updated.id }).onConflictDoNothing()
     }
 
     return c.json(updated)

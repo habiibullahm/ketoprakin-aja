@@ -18,8 +18,8 @@ export function setIo(server: any) {
       console.log("Client joined kitchen room:", socket.id)
     })
 
-    socket.on("order-status-update", (data) => {
-      io?.to("kitchen").emit("order-updated", data)
+    socket.on("join-order", (orderId: number) => {
+      socket.join(`order:${orderId}`)
     })
 
     socket.on("disconnect", () => {

@@ -31,6 +31,7 @@ export const orders = pgTable("orders", {
   orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
   customerName: varchar("customer_name", { length: 255 }).notNull(),
   customerPhone: varchar("customer_phone", { length: 20 }),
+  userId: integer("user_id").references(() => users.id),
   orderType: varchar("order_type", { length: 20 }).notNull(), // dine-in, pickup
   status: varchar("status", { length: 50 }).default("menunggu").notNull(), // menunggu, nguleg, siap-diambil, selesai
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
@@ -39,6 +40,14 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+// One stamp is earned for each paid customer order. Ten stamps unlock one reward.
+export const loyaltyStamps = pgTable("loyalty_stamps", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  orderId: integer("order_id").references(() => orders.id).unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 })
 
 // Order items (many-to-many with menu)
@@ -84,6 +93,7 @@ export type MenuItem = typeof menuItems.$inferSelect
 export type NewMenuItem = typeof menuItems.$inferInsert
 export type Order = typeof orders.$inferSelect
 export type NewOrder = typeof orders.$inferInsert
+export type LoyaltyStamp = typeof loyaltyStamps.$inferSelect
 export type OrderItem = typeof orderItems.$inferSelect
 export type NewOrderItem = typeof orderItems.$inferInsert
 export type Expense = typeof expenses.$inferSelect

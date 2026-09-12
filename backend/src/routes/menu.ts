@@ -3,7 +3,7 @@ import { db } from "../db"
 import { menuItems } from "../db/schema"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
-import { authMiddleware } from "../middleware/auth"
+import { merchantMiddleware as authMiddleware } from "../middleware/auth"
 
 const menuRoutes = new Hono()
 

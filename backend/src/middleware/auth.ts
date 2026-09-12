@@ -30,3 +30,14 @@ export const authMiddleware = async (c: Context, next: Next) => {
     return c.json({ error: "Invalid token" }, 401)
   }
 }
+
+export const merchantMiddleware = async (c: Context, next: Next) => {
+  await authMiddleware(c, (async () => {
+    const user = (c as any).get("user") as { role: string }
+    if (user.role !== "merchant") {
+      c.json({ error: "Merchant access required" }, 403)
+      return
+    }
+    await next()
+  }) as Next)
+}

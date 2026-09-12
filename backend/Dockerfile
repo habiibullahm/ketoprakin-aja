@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including devDependencies for tsx)
-RUN npm install
+RUN npm install --package-lock=false
 
 # Copy source code
 COPY . .

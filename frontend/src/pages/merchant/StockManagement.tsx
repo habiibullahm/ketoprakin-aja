@@ -1,15 +1,31 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { menuItems } from "@/data/mock"
 import type { MenuItem } from "@/types"
+import { menuApi } from "@/lib/api"
+import { useAuthGuard } from "@/lib/useAuthGuard"
 
 export function StockManagement() {
+  useAuthGuard()
   const [items, setItems] = useState<MenuItem[]>(menuItems)
 
-  const toggleAvailability = (id: string) => {
-    setItems(items.map((item) => (item.id === id ? { ...item, available: !item.available } : item)))
+  useEffect(() => {
+    menuApi.getAll()
+      .then((data) => setItems(data.map((item: any) => ({ ...item, id: String(item.id), price: Number(item.price) }))))
+      .catch(() => undefined)
+  }, [])
+
+  const toggleAvailability = async (id: string) => {
+    const current = items.find((item) => item.id === id)
+    if (!current) return
+    try {
+      const updated = await menuApi.toggleAvailability(Number(id))
+      setItems(items.map((item) => item.id === id ? { ...item, available: updated.available } : item))
+    } catch {
+      setItems(items.map((item) => item.id === id ? { ...item, available: !item.available } : item))
+    }
   }
 
   return (

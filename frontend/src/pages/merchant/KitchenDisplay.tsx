@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, ChefHat, CheckCircle, AlertCircle, LogOut } from "lucide-react"
+import { Clock, ChefHat, CheckCircle, AlertCircle, LogOut, CreditCard } from "lucide-react"
 import { ordersApi, authApi } from "@/lib/api"
+import { socket } from "@/lib/socket"
+import { useAuthGuard } from "@/lib/useAuthGuard"
 
 interface OrderItem {
   id: number
@@ -42,18 +44,22 @@ interface Order {
 }
 
 export function KitchenDisplay() {
+  useAuthGuard()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Check if logged in
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      navigate('/merchant/login')
-      return
-    }
     fetchOrders()
+    socket.connect()
+    socket.emit("join-kitchen")
+    socket.on("new-order", fetchOrders)
+    socket.on("order-status-update", fetchOrders)
+    return () => {
+      socket.off("new-order", fetchOrders)
+      socket.off("order-status-update", fetchOrders)
+      socket.disconnect()
+    }
   }, [navigate])
 
   const fetchOrders = async () => {
@@ -62,10 +68,10 @@ export function KitchenDisplay() {
       const data = await ordersApi.getActive()
       setOrders(data)
     } catch (error) {
-      console.error('Failed to fetch orders:', error)
-      if (error instanceof Error && error.message.includes('401')) {
+      console.error("Failed to fetch orders:", error)
+      if (error instanceof Error && error.message.includes("401")) {
         authApi.logout()
-        navigate('/merchant/login')
+        navigate("/merchant/login")
       }
     } finally {
       setLoading(false)
@@ -75,41 +81,41 @@ export function KitchenDisplay() {
   const updateOrderStatus = async (orderId: number, newStatus: string) => {
     try {
       await ordersApi.updateStatus(orderId, newStatus)
-      // Refresh orders
       fetchOrders()
     } catch (error) {
-      console.error('Failed to update order status:', error)
+      console.error("Failed to update order status:", error)
+    }
+  }
+
+  const confirmPayment = async (orderId: number) => {
+    try {
+      await ordersApi.updatePaymentStatus(orderId, "paid")
+      fetchOrders()
+    } catch (error) {
+      console.error("Failed to confirm payment:", error)
     }
   }
 
   const handleLogout = () => {
     authApi.logout()
-    navigate('/merchant/login')
+    navigate("/merchant/login")
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "menunggu":
-        return "bg-yellow-500"
-      case "nguleg":
-        return "bg-orange-500"
-      case "siap-diambil":
-        return "bg-green-500"
-      default:
-        return "bg-gray-500"
+      case "menunggu": return "bg-yellow-500"
+      case "nguleg": return "bg-orange-500"
+      case "siap-diambil": return "bg-green-500"
+      default: return "bg-gray-500"
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "menunggu":
-        return Clock
-      case "nguleg":
-        return ChefHat
-      case "siap-diambil":
-        return CheckCircle
-      default:
-        return AlertCircle
+      case "menunggu": return Clock
+      case "nguleg": return ChefHat
+      case "siap-diambil": return CheckCircle
+      default: return AlertCircle
     }
   }
 
@@ -138,12 +144,7 @@ export function KitchenDisplay() {
             <Badge variant="secondary" className="text-lg px-4 py-2">
               {pendingOrders.length} Pesanan Aktif
             </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-gray-400 hover:text-white"
-            >
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-gray-400 hover:text-white">
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
@@ -154,32 +155,35 @@ export function KitchenDisplay() {
           {pendingOrders.map((order) => {
             const StatusIcon = getStatusIcon(order.status)
             return (
-              <Card key={order.id} className="bg-gray-800 border-gray-700">
+              <Card key={order.id} data-testid={`order-${order.id}`} className="bg-gray-800 border-gray-700">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-xl font-bold">{order.orderNumber}</h3>
                       <p className="text-gray-400">{order.customerName}</p>
                     </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {order.status}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge className={getStatusColor(order.status)}>
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        {order.status}
+                      </Badge>
+                      <Badge variant={order.paymentStatus === "paid" ? "default" : "secondary"} className="text-xs">
+                        {order.paymentMethod.toUpperCase()} · {order.paymentStatus === "paid" ? "✓ Lunas" : "Belum Bayar"}
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     {order.orderItems.map((item) => (
                       <div key={item.id} className="bg-gray-700 rounded p-3">
                         <div className="flex justify-between items-start mb-2">
-                          <span className="font-semibold">
-                            {item.quantity}x {item.menuItem.name}
-                          </span>
+                          <span className="font-semibold">{item.quantity}x {item.menuItem.name}</span>
                         </div>
                         <div className="text-sm text-gray-300 space-y-1">
                           <p>🌶️ Cabai: {item.spiceLevel}</p>
                           <p>🧄 Bawang: {item.garlicAmount}</p>
                           <p>🥣 Bumbu: {item.sauceConsistency}</p>
-                          {item.toppings && item.toppings !== '[]' && (
+                          {item.toppings && item.toppings !== "[]" && (
                             <p>📝 Extra: {JSON.parse(item.toppings).join(", ")}</p>
                           )}
                         </div>
@@ -192,33 +196,37 @@ export function KitchenDisplay() {
                     <span>{new Date(order.createdAt).toLocaleTimeString("id-ID")}</span>
                   </div>
 
-                  <div className="flex gap-2">
-                    {order.status === "menunggu" && (
+                  <div className="space-y-2">
+                    {/* Payment confirmation */}
+                    {order.paymentStatus === "pending" && (
                       <Button
-                        className="flex-1 bg-orange-500 hover:bg-orange-600"
-                        onClick={() => updateOrderStatus(order.id, "nguleg")}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => confirmPayment(order.id)}
                       >
-                        <ChefHat className="h-4 w-4 mr-2" />
-                        Mulai Nguleg
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Konfirmasi Bayar
                       </Button>
                     )}
-                    {order.status === "nguleg" && (
-                      <Button
-                        className="flex-1 bg-green-500 hover:bg-green-600"
-                        onClick={() => updateOrderStatus(order.id, "siap-diambil")}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Selesai
-                      </Button>
-                    )}
-                    {order.status === "siap-diambil" && (
-                      <Button
-                        className="flex-1 bg-blue-500 hover:bg-blue-600"
-                        onClick={() => updateOrderStatus(order.id, "selesai")}
-                      >
-                        Diambil
-                      </Button>
-                    )}
+                    {/* Status advancement */}
+                    <div className="flex gap-2">
+                      {order.status === "menunggu" && (
+                        <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => updateOrderStatus(order.id, "nguleg")}>
+                          <ChefHat className="h-4 w-4 mr-2" />
+                          Mulai Nguleg
+                        </Button>
+                      )}
+                      {order.status === "nguleg" && (
+                        <Button className="flex-1 bg-green-500 hover:bg-green-600" onClick={() => updateOrderStatus(order.id, "siap-diambil")}>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Selesai
+                        </Button>
+                      )}
+                      {order.status === "siap-diambil" && (
+                        <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => updateOrderStatus(order.id, "selesai")}>
+                          Diambil
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

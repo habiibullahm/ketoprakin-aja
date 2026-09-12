@@ -1,16 +1,16 @@
 # Ketoprakin Aja - Aplikasi Warung Ketoprak Mas Edo
 
-Platform pemesanan digital untuk Warung Ketoprak Mas Edo. Frontend-only implementation menggunakan React, TypeScript, Tailwind CSS, dan shadcn/ui.
+Platform pemesanan digital untuk Warung Ketoprak Mas Edo, dengan frontend React dan backend API Hono.
 
 ## 🚀 Quick Start
 
 ```bash
-cd /home/ubuntu/projects/ketoprakin-aja
+cd frontend
 npm install
 npm run dev
 ```
 
-Buka browser di `http://localhost:5173`
+Buka browser di `http://localhost:5173`. Untuk menjalankan API secara lokal, buka terminal lain lalu jalankan `cd backend`, `npm install`, dan `npm run dev`.
 
 ## 📱 Features
 
@@ -37,14 +37,20 @@ Buka browser di `http://localhost:5173`
 ## 📂 Project Structure
 
 ```
-src/
-├── components/ui/      # shadcn components
-├── pages/
-│   ├── customer/       # Customer-facing pages
-│   └── merchant/       # Merchant dashboard
-├── data/               # Mock data
-├── types/              # TypeScript types
-└── lib/                # Utilities
+frontend/                # React + Vite application
+├── src/
+│   ├── components/ui/  # shadcn components
+│   ├── pages/          # Customer and merchant pages
+│   ├── data/           # Mock data
+│   ├── types/          # TypeScript types
+│   └── lib/            # Utilities and API client
+├── public/             # Static assets
+└── package.json
+backend/                 # Hono API and database code
+├── src/
+│   ├── routes/         # API endpoints
+│   └── db/             # Drizzle schema and connection
+└── package.json
 ```
 
 ## 📖 Documentation
@@ -60,12 +66,7 @@ src/
 
 ## 🚧 Status
 
-**Frontend-only** - Semua data menggunakan mock. Untuk production, perlu:
-- Backend API (Node.js/Express/Next.js)
-- Database (PostgreSQL/MongoDB)
-- Payment gateway integration
-- Real-time updates (WebSocket)
-- Authentication system
+Backend API, PostgreSQL, authentication, and Socket.IO support are included. Payment gateway integration remains to be completed for production.
 
 ## 📄 License
 

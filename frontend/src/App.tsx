@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom"
 import { CustomerMenu } from "@/pages/customer/CustomerMenu"
 import { OrderTracking } from "@/pages/customer/OrderTracking"
+import { CustomerLogin } from "@/pages/customer/Login"
+import { CustomerAccount } from "@/pages/customer/Account"
+import { CustomerOnboarding } from "@/pages/customer/Onboarding"
 import { KitchenDisplay } from "@/pages/merchant/KitchenDisplay"
 import { FinancialReport } from "@/pages/merchant/FinancialReport"
 import { StockManagement } from "@/pages/merchant/StockManagement"
@@ -21,13 +24,23 @@ function HomePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/customer/menu">
+            <Link to="/customer">
               <CardContent className="p-6 text-center">
                 <Utensils className="h-12 w-12 mx-auto text-primary mb-4" />
                 <h2 className="text-xl font-bold mb-2">Pesan Menu</h2>
                 <p className="text-sm text-muted-foreground">
                   Pilih menu & kustomisasi ulekan
                 </p>
+              </CardContent>
+            </Link>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Link to="/customer/login">
+              <CardContent className="p-6 text-center">
+                <Utensils className="h-12 w-12 mx-auto text-primary mb-4" />
+                <h2 className="text-xl font-bold mb-2">Akun Pelanggan</h2>
+                <p className="text-sm text-muted-foreground">Login, riwayat pesanan, dan stempel loyalitas</p>
               </CardContent>
             </Link>
           </Card>
@@ -135,6 +148,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/customer/menu" element={<CustomerMenu />} />
+        <Route path="/customer" element={<CustomerOnboarding />} />
+        <Route path="/customer/login" element={<CustomerLogin />} />
+        <Route path="/customer/account" element={<CustomerAccount />} />
         <Route path="/customer/tracking" element={<OrderTracking />} />
         <Route path="/merchant/login" element={<MerchantLogin />} />
         <Route

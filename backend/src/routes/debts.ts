@@ -3,7 +3,7 @@ import { db } from "../db"
 import { debts } from "../db/schema"
 import { eq, desc } from "drizzle-orm"
 import { z } from "zod"
-import { authMiddleware } from "../middleware/auth"
+import { merchantMiddleware as authMiddleware } from "../middleware/auth"
 
 const debtRoutes = new Hono()
 

@@ -10,35 +10,26 @@
 
 ## Project Structure
 ```
-src/
-├── components/
-│   └── ui/              # shadcn-style components
-│       ├── badge.tsx
-│       ├── button.tsx
-│       ├── card.tsx
-│       ├── input.tsx
-│       └── label.tsx
-├── data/
-│   └── mock.ts          # Mock data (menu, orders, expenses, debts)
-├── lib/
-│   └── utils.ts         # Utility functions (cn helper)
-├── pages/
-│   ├── customer/
-│   │   ├── CustomerMenu.tsx    # Menu & customization
-│   │   └── OrderTracking.tsx   # Live order tracking
-│   └── merchant/
-│       ├── KitchenDisplay.tsx  # KDS for kitchen
-│       ├── FinancialReport.tsx # P&L report
-│       ├── StockManagement.tsx # Toggle menu availability
-│       └── DebtBook.tsx        # Customer debt tracking
-├── types/
-│   └── index.ts         # TypeScript interfaces
-├── App.tsx              # Main app with routing
-├── main.tsx             # Entry point
-└── index.css            # Tailwind + theme variables
+frontend/
+├── src/
+│   ├── components/ui/   # shadcn-style components
+│   ├── data/            # Mock data
+│   ├── lib/             # Utilities and API client
+│   ├── pages/           # Customer and merchant pages
+│   ├── types/           # TypeScript interfaces
+│   ├── App.tsx          # Main app with routing
+│   ├── main.tsx         # Entry point
+│   └── index.css        # Tailwind + theme variables
+└── package.json
+backend/
+├── src/
+│   ├── db/              # Drizzle schema and database connection
+│   ├── middleware/      # Authentication middleware
+│   └── routes/          # API routes
+└── package.json
 ```
 
-## Features Implemented (Frontend Only)
+## Features
 
 ### Customer Side
 - ✅ Menu browsing with categories (ketoprak, minuman)
@@ -73,10 +64,16 @@ src/
 
 ## Development
 ```bash
+cd frontend
 npm install
-npm run dev      # Start dev server
+npm run dev      # Start frontend dev server
 npm run build    # Production build
 npm run preview  # Preview production build
+
+# In a second terminal
+cd backend
+npm install
+npm run dev      # Start backend API server
 ```
 
 ## Next Steps (Backend Integration)

@@ -44,6 +44,7 @@ async function initDatabase() {
         order_number VARCHAR(50) UNIQUE NOT NULL,
         customer_name VARCHAR(255) NOT NULL,
         customer_phone VARCHAR(20),
+        user_id INTEGER REFERENCES users(id),
         order_type VARCHAR(20) NOT NULL,
         status VARCHAR(50) NOT NULL DEFAULT 'menunggu',
         total_amount DECIMAL(10,2) NOT NULL,
@@ -52,6 +53,16 @@ async function initDatabase() {
         notes TEXT,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS loyalty_stamps (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        order_id INTEGER UNIQUE NOT NULL REFERENCES orders(id),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
     

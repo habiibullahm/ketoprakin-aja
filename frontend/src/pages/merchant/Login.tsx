@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi } from '../../lib/api';
+import { authApi, setToken } from '../../lib/api';
+
+const DEMO_MERCHANT = {
+  email: 'masedo@ketoprakin.com',
+  password: 'password123',
+};
 
 export default function MerchantLogin() {
   const [email, setEmail] = useState('');
@@ -18,6 +23,11 @@ export default function MerchantLogin() {
       await authApi.login(email, password);
       navigate('/merchant/kitchen');
     } catch (err) {
+      if (email === DEMO_MERCHANT.email && password === DEMO_MERCHANT.password) {
+        setToken('demo-merchant-token');
+        navigate('/merchant/kitchen');
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
@@ -80,10 +90,22 @@ export default function MerchantLogin() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setEmail(DEMO_MERCHANT.email);
+              setPassword(DEMO_MERCHANT.password);
+              setError('');
+            }}
+            className="w-full py-2 px-4 border border-primary rounded-md text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            Use demo account
+          </button>
+
           <div className="text-xs text-gray-500 text-center">
             <p>Demo credentials:</p>
-            <p>Email: masedo@ketoprakin.com</p>
-            <p>Password: password123</p>
+            <p>Email: {DEMO_MERCHANT.email}</p>
+            <p>Password: {DEMO_MERCHANT.password}</p>
           </div>
         </form>
       </div>

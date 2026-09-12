@@ -4,10 +4,11 @@ import { ShoppingCart, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { menuApi, ordersApi } from "@/lib/api"
+import { authApi, menuApi, ordersApi } from "@/lib/api"
+import { menuItems as mockMenuItems } from "@/data/mock"
 
 interface MenuItem {
-  id: number
+  id: number | string
   name: string
   description: string
   price: string
@@ -40,6 +41,10 @@ export function CustomerMenu() {
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(true)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [orderType, setOrderType] = useState<"pickup" | "dine-in">("pickup")
+  const [paymentMethod, setPaymentMethod] = useState<"qris" | "gopay" | "ovo" | "dana">("qris")
+  const [customerName, setCustomerName] = useState("")
+  const [checkoutError, setCheckoutError] = useState("")
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -53,6 +58,12 @@ export function CustomerMenu() {
       setMenuItems(data)
     } catch (error) {
       console.error('Failed to fetch menu:', error)
+      // Keep the ordering screen usable while the local API or database is offline.
+      setMenuItems(
+        mockMenuItems
+          .filter((item) => item.available)
+          .map((item) => ({ ...item, price: item.price.toString() }))
+      )
     } finally {
       setLoading(false)
     }
@@ -78,12 +89,27 @@ export function CustomerMenu() {
   const total = cart.reduce((sum, item) => sum + parseFloat(item.menu.price) * item.quantity, 0)
 
   const handleCheckout = async () => {
+    if (!customerName.trim()) {
+      setCheckoutError("Masukkan nama untuk pesanan Anda.")
+      return
+    }
+
     try {
+      const user = await authApi.me()
+      if (user.role !== "customer") throw new Error()
+    } catch {
+      setCheckoutError("Silakan login sebagai pelanggan sebelum checkout.")
+      navigate("/customer/login")
+      return
+    }
+
+    try {
+      setCheckoutError("")
       setCheckoutLoading(true)
       
       // Create order via API
       const orderData = {
-        customerName: "Pelanggan", // In real app, get from user input
+        customerName: customerName.trim(),
         items: cart.map(item => ({
           menuId: item.menu.id,
           quantity: item.quantity,
@@ -92,8 +118,8 @@ export function CustomerMenu() {
           sauceConsistency: item.customization.sauceConsistency,
           toppings: item.customization.toppings,
         })),
-        orderType: "pickup",
-        paymentMethod: "qris",
+        orderType,
+        paymentMethod,
       }
 
       const order = await ordersApi.create(orderData)
@@ -301,6 +327,35 @@ export function CustomerMenu() {
                 </div>
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+              <label className="space-y-1">
+                <span className="text-muted-foreground">Tipe pesanan</span>
+                <select className="w-full rounded border p-2" value={orderType} onChange={(event) => setOrderType(event.target.value as "pickup" | "dine-in")}>
+                  <option value="pickup">Pick-up</option>
+                  <option value="dine-in">Dine-in</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-muted-foreground">Pembayaran</span>
+                <select className="w-full rounded border p-2" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as "qris" | "gopay" | "ovo" | "dana")}>
+                  <option value="qris">QRIS</option>
+                  <option value="gopay">GoPay</option>
+                  <option value="ovo">OVO</option>
+                  <option value="dana">DANA</option>
+                </select>
+              </label>
+            </div>
+            <label className="block mb-3 text-sm space-y-1">
+              <span className="text-muted-foreground">Nama pemesan</span>
+              <input
+                className="w-full rounded border p-2"
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
+                placeholder="Contoh: Budi"
+                required
+              />
+            </label>
+            {checkoutError && <p className="mb-3 text-sm text-destructive">{checkoutError}</p>}
             <Button 
               className="w-full" 
               size="lg" 

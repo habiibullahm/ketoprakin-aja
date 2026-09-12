@@ -20,7 +20,7 @@ const loginSchema = z.object({
   password: z.string(),
 })
 
-// Register new merchant
+// Register a customer. Merchant accounts are provisioned by the operator.
 authRoutes.post("/register", async (c) => {
   try {
     const body = await c.req.json()
@@ -45,7 +45,7 @@ authRoutes.post("/register", async (c) => {
         email: validated.email,
         password: hashedPassword,
         name: validated.name,
-        role: "merchant",
+        role: "customer",
       })
       .returning()
 
