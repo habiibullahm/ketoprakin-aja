@@ -73,6 +73,8 @@ Backend API, PostgreSQL, authentication, and Socket.IO support are included. Pay
 
 For a separately hosted frontend such as Vercel, configure `VITE_API_URL` with the HTTPS API base ending in `/api` and `VITE_SOCKET_URL` with the HTTPS backend origin. The repository intentionally contains no HTTP rewrite to the VPS. The Docker deployment uses same-origin Nginx proxying and does not require these variables.
 
+Pushes to `master` are automatically linted, built, and deployed to the Vercel production project `ketoprakin-aja` by `.github/workflows/deploy-vercel.yml`. Configure the repository Actions secret `VERCEL_TOKEN` with a Vercel access token that can deploy this project.
+
 ## 📄 License
 
 MIT

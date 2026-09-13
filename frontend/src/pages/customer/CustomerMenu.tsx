@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ShoppingCart, Plus, Minus, Clock3, MapPin, Search, UserRound } from "lucide-react"
+import { ShoppingCart, Plus, Minus, Clock3, MapPin, Search, UserRound, ChevronUp, X, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -32,6 +32,8 @@ interface CartItem {
 export function CustomerMenu() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
+  const [isCartOpen, setIsCartOpen] = useState(false)
+  const [editingCartIndex, setEditingCartIndex] = useState<number | null>(null)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [customization, setCustomization] = useState<CartItem["customization"]>({
     spiceLevel: 5,
@@ -73,8 +75,13 @@ export function CustomerMenu() {
 
   const addToCart = () => {
     if (!selectedItem) return
-    setCart([...cart, { menu: selectedItem, customization, quantity }])
+    const nextItem = { menu: selectedItem, customization, quantity }
+    setCart((currentCart) => editingCartIndex === null
+      ? [...currentCart, nextItem]
+      : currentCart.map((item, index) => index === editingCartIndex ? nextItem : item)
+    )
     setSelectedItem(null)
+    setEditingCartIndex(null)
     setQuantity(1)
     setCustomization({
       spiceLevel: 5,
@@ -85,7 +92,7 @@ export function CustomerMenu() {
   }
 
   const addSimpleItem = (menu: MenuItem) => {
-    setCart([...cart, {
+    setCart((currentCart) => [...currentCart, {
       menu,
       customization: { spiceLevel: 0, garlicAmount: "normal", sauceConsistency: "pas", toppings: [] },
       quantity: 1,
@@ -93,7 +100,32 @@ export function CustomerMenu() {
   }
 
   const removeFromCart = (index: number) => {
-    setCart(cart.filter((_, i) => i !== index))
+    setCart((currentCart) => {
+      const nextCart = currentCart.filter((_, i) => i !== index)
+      if (nextCart.length === 0) setIsCartOpen(false)
+      return nextCart
+    })
+  }
+
+  const updateCartQuantity = (index: number, delta: number) => {
+    setCart((currentCart) => currentCart.map((item, itemIndex) => itemIndex === index
+      ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+      : item
+    ))
+  }
+
+  const editCartItem = (index: number) => {
+    const item = cart[index]
+    setEditingCartIndex(index)
+    setSelectedItem(item.menu)
+    setCustomization({ ...item.customization, toppings: [...item.customization.toppings] })
+    setQuantity(item.quantity)
+  }
+
+  const closeItemEditor = () => {
+    setSelectedItem(null)
+    setEditingCartIndex(null)
+    setQuantity(1)
   }
 
   const total = cart.reduce((sum, item) => {
@@ -160,7 +192,7 @@ export function CustomerMenu() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className={`min-h-screen bg-gray-50 ${cart.length > 0 ? "pb-28" : "pb-20"}`}>
       <div className="sticky top-0 z-30 border-b bg-white/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
           <div><h1 className="text-xl font-black text-primary">Ketoprakin Aja</h1><p className="text-xs text-muted-foreground">Warung Ketoprak Mas Edo</p></div>
@@ -194,7 +226,10 @@ export function CustomerMenu() {
                     <span className="font-bold text-primary">
                       Rp {parseFloat(item.price).toLocaleString("id-ID")}
                     </span>
-                    <Button size="sm" onClick={() => setSelectedItem(item)}>
+                    <Button size="sm" onClick={() => {
+                      setEditingCartIndex(null)
+                      setSelectedItem(item)
+                    }}>
                       Pilih
                     </Button>
                   </div>
@@ -330,11 +365,11 @@ export function CustomerMenu() {
               )}
 
               <div className="flex gap-2 pt-4">
-                <Button variant="outline" className="flex-1" onClick={() => setSelectedItem(null)}>
+                <Button variant="outline" className="flex-1" onClick={closeItemEditor}>
                   Batal
                 </Button>
                 <Button className="flex-1" onClick={addToCart}>
-                  Tambah ke Keranjang
+                  {editingCartIndex === null ? "Tambah ke Keranjang" : "Simpan Perubahan"}
                 </Button>
               </div>
             </CardContent>
@@ -343,33 +378,58 @@ export function CustomerMenu() {
       )}
 
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
-          <div className="max-w-md mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                <span className="font-semibold">{cart.length} item</span>
-              </div>
-              <span className="text-xl font-bold text-primary">
-                Rp {total.toLocaleString("id-ID")}
-              </span>
+        <>
+          {!isCartOpen && (
+            <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur">
+              <button
+                type="button"
+                aria-expanded="false"
+                aria-label="Buka keranjang"
+                className="mx-auto flex w-full max-w-md items-center justify-between rounded-xl bg-primary px-4 py-3 text-left text-primary-foreground shadow-sm"
+                onClick={() => setIsCartOpen(true)}
+              >
+                <span className="flex items-center gap-3">
+                  <span className="relative"><ShoppingCart className="h-5 w-5" /><span className="absolute -right-2 -top-2 rounded-full bg-white px-1 text-[10px] font-bold text-primary">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span></span>
+                  <span><span className="block text-xs opacity-80">Total pesanan</span><span className="font-bold">Rp {total.toLocaleString("id-ID")}</span></span>
+                </span>
+                <span className="flex items-center gap-1 text-sm font-semibold">Lihat keranjang <ChevronUp className="h-4 w-4" /></span>
+              </button>
             </div>
-            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-              {cart.map((item, index) => (
-                <div key={index} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
-                  <div>
-                    <p className="font-medium">{item.menu.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.quantity}x • Cabai {item.customization.spiceLevel}
-                    </p>
+          )}
+
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 bg-black/45" role="presentation" onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setIsCartOpen(false)
+            }}>
+              <section role="dialog" aria-modal="true" aria-label="Keranjang dan checkout" className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl">
+                <div className="mx-auto max-w-md">
+                  <div className="mb-4 flex items-center justify-between border-b pb-3">
+                    <div className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /><div><h2 className="font-bold">Pesananmu</h2><p className="text-xs text-muted-foreground">Masih bisa diubah sebelum checkout</p></div></div>
+                    <Button size="icon" variant="ghost" aria-label="Tutup keranjang" onClick={() => setIsCartOpen(false)}><X className="h-5 w-5" /></Button>
                   </div>
-                  <Button size="icon" variant="ghost" onClick={() => removeFromCart(index)}>
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+
+                  <div className="mb-4 space-y-3">
+                    {cart.map((item, index) => (
+                      <div key={`${item.menu.id}-${index}`} className="rounded-xl border bg-gray-50 p-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0"><p className="font-semibold">{item.menu.name}</p><p className="mt-1 text-xs text-muted-foreground">{item.menu.category === "ketoprak" ? `Cabai ${item.customization.spiceLevel} • Bawang ${item.customization.garlicAmount} • Bumbu ${item.customization.sauceConsistency}` : "Tanpa kustomisasi"}</p></div>
+                          <Button size="icon" variant="ghost" aria-label={`Hapus ${item.menu.name}`} onClick={() => removeFromCart(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <Button type="button" size="sm" variant="ghost" onClick={() => editCartItem(index)}><Pencil className="mr-1 h-3.5 w-3.5" />Ubah</Button>
+                          <div className="flex items-center gap-1 rounded-lg border bg-white p-1">
+                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label={`Kurangi ${item.menu.name}`} onClick={() => updateCartQuantity(index, -1)} disabled={item.quantity === 1}><Minus className="h-3.5 w-3.5" /></Button>
+                            <span className="w-7 text-center font-semibold">{item.quantity}</span>
+                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" aria-label={`Tambah ${item.menu.name}`} onClick={() => updateCartQuantity(index, 1)}><Plus className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button type="button" variant="outline" className="mb-4 w-full" onClick={() => setIsCartOpen(false)}>+ Tambah menu lagi</Button>
+
+                  <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
               <label className="space-y-1">
                 <span className="text-muted-foreground">Tipe pesanan</span>
                 <select className="w-full rounded border p-2" value={orderType} onChange={(event) => setOrderType(event.target.value as "pickup" | "dine-in")}>
@@ -387,7 +447,7 @@ export function CustomerMenu() {
                 </select>
               </label>
             </div>
-            <label className="block mb-3 text-sm space-y-1">
+                  <label className="block mb-3 text-sm space-y-1">
               <span className="text-muted-foreground">Nama pemesan</span>
               <input
                 className="w-full rounded border p-2"
@@ -396,8 +456,8 @@ export function CustomerMenu() {
                 placeholder="Contoh: Budi"
                 required
               />
-            </label>
-            <label className="block mb-3 text-sm space-y-1">
+                  </label>
+                  <label className="block mb-3 text-sm space-y-1">
               <span className="text-muted-foreground">Nomor WhatsApp</span>
               <input
                 className="w-full rounded border p-2"
@@ -408,18 +468,17 @@ export function CustomerMenu() {
                 required
               />
               {whatsappNumber && normalizeIndonesianPhone(whatsappNumber) && <span className="block text-xs text-emerald-700">Disimpan sebagai {normalizeIndonesianPhone(whatsappNumber)}</span>}
-            </label>
-            {checkoutError && <p className="mb-3 text-sm text-destructive">{checkoutError}</p>}
-            <Button 
-              className="w-full" 
-              size="lg" 
-              onClick={handleCheckout}
-              disabled={checkoutLoading}
-            >
-              {checkoutLoading ? "Memproses..." : "Checkout"}
-            </Button>
-          </div>
-        </div>
+                  </label>
+                  {checkoutError && <p className="mb-3 text-sm text-destructive">{checkoutError}</p>}
+                  <div className="mb-3 flex items-center justify-between border-t pt-3"><span className="font-semibold">Total</span><span className="text-xl font-black text-primary">Rp {total.toLocaleString("id-ID")}</span></div>
+                  <Button className="w-full" size="lg" onClick={handleCheckout} disabled={checkoutLoading}>
+                    {checkoutLoading ? "Memproses..." : "Checkout"}
+                  </Button>
+                </div>
+              </section>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

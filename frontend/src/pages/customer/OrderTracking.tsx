@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Clock, ChefHat, PartyPopper, Copy, MessageCircle } from "lucide-react"
+import { Check, CheckCircle, Clock, ChefHat, PartyPopper, Copy, MessageCircle } from "lucide-react"
 import { ordersApi } from "@/lib/api"
 import { socket } from "@/lib/socket"
 
@@ -38,6 +38,13 @@ export function OrderTracking() {
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(Boolean(trackingToken))
   const [error, setError] = useState("")
+  const [copied, setCopied] = useState<"order" | "link" | null>(null)
+
+  const copyToClipboard = async (value: string, type: "order" | "link") => {
+    await navigator.clipboard.writeText(value)
+    setCopied(type)
+    window.setTimeout(() => setCopied((current) => current === type ? null : current), 1800)
+  }
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -136,7 +143,18 @@ export function OrderTracking() {
         <div className="text-center">
           <h1 className="text-2xl font-bold">Lacak Pesanan</h1>
           <p className="text-muted-foreground">Halo, {order.customerName}!</p>
-          <p className="text-sm text-muted-foreground">Order: {order.orderNumber}</p>
+          <div className="mt-1 flex items-center justify-center gap-1 text-sm text-muted-foreground">
+            <span>Order: {order.orderNumber}</span>
+            <button
+              type="button"
+              aria-label="Salin nomor order"
+              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-primary hover:bg-primary/10"
+              onClick={() => copyToClipboard(order.orderNumber, "order")}
+            >
+              {copied === "order" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied === "order" ? "Tersalin" : "Salin"}
+            </button>
+          </div>
         </div>
 
         {/* Ready banner */}
@@ -208,10 +226,19 @@ export function OrderTracking() {
         </Card>
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
-            <a href={`https://wa.me/${savedPhone ?? ""}?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer"><MessageCircle className="mr-2 h-4 w-4" />Simpan ke WhatsApp</a>
+          <a
+            className={buttonVariants({ className: "w-full bg-emerald-600 text-center hover:bg-emerald-700" })}
+            href={`https://wa.me/${savedPhone ?? ""}?text=${encodeURIComponent(shareText)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span>Simpan ke WhatsApp</span>
+          </a>
+          <Button variant="outline" onClick={() => copyToClipboard(trackingUrl, "link")}>
+            {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied === "link" ? "Link tersalin" : "Salin link"}
           </Button>
-          <Button variant="outline" onClick={() => navigator.clipboard.writeText(trackingUrl)}><Copy className="mr-2 h-4 w-4" />Salin link</Button>
         </div>
         <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">Pesan Lagi</Button>
       </div>

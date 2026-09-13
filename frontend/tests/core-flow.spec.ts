@@ -43,6 +43,7 @@ test("guest checkout validates WhatsApp and creates a secure tracking link", asy
   await page.goto("/")
   await page.getByRole("button", { name: "Pilih" }).first().click()
   await page.getByRole("button", { name: "Tambah ke Keranjang" }).click()
+  await page.getByRole("button", { name: "Buka keranjang" }).click()
   await page.getByPlaceholder("Contoh: Budi").fill("E2E Guest")
   await page.getByPlaceholder("Contoh: 0812-3456 7890").fill("+62+62812")
   await page.getByRole("button", { name: "Checkout" }).click()
@@ -51,6 +52,7 @@ test("guest checkout validates WhatsApp and creates a secure tracking link", asy
   await page.getByRole("button", { name: "Checkout" }).click()
   await expect(page).toHaveURL(/\/track\/[A-Za-z0-9_-]{21}$/)
   await expect(page.getByRole("link", { name: "Simpan ke WhatsApp" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Salin nomor order" })).toBeVisible()
 })
 
 test("public tracking hides internal data and numeric lookup is protected", async ({ request }) => {
