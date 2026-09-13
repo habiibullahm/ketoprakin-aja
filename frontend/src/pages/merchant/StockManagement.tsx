@@ -10,6 +10,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard"
 export function StockManagement() {
   useAuthGuard()
   const [items, setItems] = useState<MenuItem[]>(menuItems)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     menuApi.getAll()
@@ -21,10 +22,11 @@ export function StockManagement() {
     const current = items.find((item) => item.id === id)
     if (!current) return
     try {
+      setError("")
       const updated = await menuApi.toggleAvailability(Number(id))
       setItems(items.map((item) => item.id === id ? { ...item, available: updated.available } : item))
-    } catch {
-      setItems(items.map((item) => item.id === id ? { ...item, available: !item.available } : item))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Perubahan stok gagal disimpan")
     }
   }
 
@@ -35,6 +37,7 @@ export function StockManagement() {
           <h1 className="text-2xl font-bold">Manajemen Stok</h1>
           <p className="text-muted-foreground">Toggle ketersediaan bahan/menu</p>
         </div>
+        {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}. Silakan coba lagi.</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {items.map((item) => (

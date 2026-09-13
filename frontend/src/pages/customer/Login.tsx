@@ -15,8 +15,11 @@ export function CustomerLogin() {
     event.preventDefault()
     try {
       const result = isRegistering ? await authApi.register(email, password, name) : await authApi.login(email, password)
-      if (result.user.role !== "customer") throw new Error("Gunakan halaman login merchant untuk akun admin.")
-      navigate("/customer/menu")
+      if (result.user.role !== "customer") {
+        authApi.logout()
+        throw new Error("Gunakan halaman login merchant untuk akun admin.")
+      }
+      navigate("/")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal")
     }

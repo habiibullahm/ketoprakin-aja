@@ -3,7 +3,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? (
 );
 
 // Helper function to get token from localStorage
-const getToken = (): string | null => {
+export const getToken = (): string | null => {
   return localStorage.getItem('authToken');
 };
 
@@ -115,6 +115,15 @@ export const ordersApi = {
 
   getById: (id: number) => apiRequest<any>(`/orders/${id}`),
 
+  getByTrackingToken: (trackingToken: string) =>
+    apiRequest<any>(`/orders/track/${encodeURIComponent(trackingToken)}`),
+
+  createGuest: (data: any) =>
+    apiRequest<any>('/orders/guest', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   create: (data: any) =>
     apiRequest<any>('/orders', {
       method: 'POST',
@@ -131,6 +140,12 @@ export const ordersApi = {
     apiRequest<any>(`/orders/${id}/payment`, {
       method: 'PATCH',
       body: JSON.stringify({ paymentStatus }),
+    }),
+
+  performAction: (id: number, action: string) =>
+    apiRequest<any>(`/orders/${id}/action`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action }),
     }),
 };
 

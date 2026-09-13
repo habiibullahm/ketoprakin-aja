@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, ChefHat, CheckCircle, AlertCircle, LogOut, CreditCard } from "lucide-react"
-import { ordersApi, authApi } from "@/lib/api"
+import { ordersApi, authApi, getToken } from "@/lib/api"
 import { socket } from "@/lib/socket"
 import { useAuthGuard } from "@/lib/useAuthGuard"
 
@@ -47,10 +47,29 @@ export function KitchenDisplay() {
   useAuthGuard()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [busyOrderId, setBusyOrderId] = useState<number | null>(null)
+  const [actionError, setActionError] = useState("")
   const navigate = useNavigate()
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await ordersApi.getActive()
+      setOrders(data)
+    } catch (error) {
+      console.error("Failed to fetch orders:", error)
+      if (error instanceof Error && (error.message.includes("Unauthorized") || error.message.includes("401"))) {
+        authApi.logout()
+        navigate("/merchant/login")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [navigate])
 
   useEffect(() => {
     fetchOrders()
+    socket.auth = { token: getToken() }
     socket.connect()
     socket.emit("join-kitchen")
     socket.on("new-order", fetchOrders)
@@ -60,39 +79,18 @@ export function KitchenDisplay() {
       socket.off("order-status-update", fetchOrders)
       socket.disconnect()
     }
-  }, [navigate])
+  }, [fetchOrders])
 
-  const fetchOrders = async () => {
+  const performAction = async (orderId: number, action: string) => {
     try {
-      setLoading(true)
-      const data = await ordersApi.getActive()
-      setOrders(data)
+      setActionError("")
+      setBusyOrderId(orderId)
+      await ordersApi.performAction(orderId, action)
+      await fetchOrders()
     } catch (error) {
-      console.error("Failed to fetch orders:", error)
-      if (error instanceof Error && error.message.includes("401")) {
-        authApi.logout()
-        navigate("/merchant/login")
-      }
+      setActionError(error instanceof Error ? error.message : "Aksi gagal. Silakan coba lagi.")
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
-    try {
-      await ordersApi.updateStatus(orderId, newStatus)
-      fetchOrders()
-    } catch (error) {
-      console.error("Failed to update order status:", error)
-    }
-  }
-
-  const confirmPayment = async (orderId: number) => {
-    try {
-      await ordersApi.updatePaymentStatus(orderId, "paid")
-      fetchOrders()
-    } catch (error) {
-      console.error("Failed to confirm payment:", error)
+      setBusyOrderId(null)
     }
   }
 
@@ -135,6 +133,7 @@ export function KitchenDisplay() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
       <div className="max-w-7xl mx-auto">
+        {actionError && <div className="mb-4 rounded-lg border border-red-500 bg-red-950 p-3 text-red-100">{actionError}</div>}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold">Kitchen Display</h1>
@@ -197,35 +196,25 @@ export function KitchenDisplay() {
                   </div>
 
                   <div className="space-y-2">
-                    {/* Payment confirmation */}
-                    {order.paymentStatus === "pending" && (
-                      <Button
-                        className="w-full bg-emerald-600 hover:bg-emerald-700"
-                        onClick={() => confirmPayment(order.id)}
-                      >
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Konfirmasi Bayar
-                      </Button>
-                    )}
-                    {/* Status advancement */}
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                       {order.status === "menunggu" && (
-                        <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={() => updateOrderStatus(order.id, "nguleg")}>
+                        <Button disabled={busyOrderId === order.id} className="h-14 w-full bg-orange-500 text-base font-black hover:bg-orange-600" onClick={() => performAction(order.id, "start_preparing")}>
                           <ChefHat className="h-4 w-4 mr-2" />
-                          Mulai Nguleg
+                          {busyOrderId === order.id ? "MEMPROSES..." : "MULAI NGULEG"}
                         </Button>
                       )}
                       {order.status === "nguleg" && (
-                        <Button className="flex-1 bg-green-500 hover:bg-green-600" onClick={() => updateOrderStatus(order.id, "siap-diambil")}>
+                        <Button disabled={busyOrderId === order.id} className="h-14 w-full bg-green-500 text-base font-black hover:bg-green-600" onClick={() => performAction(order.id, order.paymentStatus === "paid" ? "mark_ready" : "mark_ready_and_paid")}>
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Selesai
+                          {busyOrderId === order.id ? "MEMPROSES..." : order.paymentStatus === "paid" ? "SIAP DIAMBIL" : "LUNAS & SIAP DIAMBIL"}
                         </Button>
                       )}
                       {order.status === "siap-diambil" && (
-                        <Button className="flex-1 bg-blue-500 hover:bg-blue-600" onClick={() => updateOrderStatus(order.id, "selesai")}>
-                          Diambil
+                        <Button disabled={busyOrderId === order.id} className="h-14 w-full bg-blue-500 text-base font-black hover:bg-blue-600" onClick={() => performAction(order.id, order.paymentStatus === "paid" ? "mark_collected" : "mark_collected_and_paid")}>
+                          {busyOrderId === order.id ? "MEMPROSES..." : order.paymentStatus === "paid" ? "SUDAH DIAMBIL" : "LUNAS & SUDAH DIAMBIL"}
                         </Button>
                       )}
+                      {order.status === "menunggu" && order.paymentStatus === "pending" && <Button disabled={busyOrderId === order.id} variant="outline" className="w-full border-gray-600 bg-transparent text-gray-200" onClick={() => performAction(order.id, "mark_paid")}><CreditCard className="mr-2 h-4 w-4" />Tandai lunas lebih awal</Button>}
                     </div>
                   </div>
                 </CardContent>

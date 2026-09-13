@@ -29,6 +29,7 @@ export const menuItems = pgTable("menu_items", {
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
+  trackingToken: varchar("tracking_token", { length: 32 }).unique().notNull(),
   customerName: varchar("customer_name", { length: 255 }).notNull(),
   customerPhone: varchar("customer_phone", { length: 20 }),
   userId: integer("user_id").references(() => users.id),

@@ -16,6 +16,7 @@ Buka browser di `http://localhost:5173`. Untuk menjalankan API secara lokal, buk
 
 ### Customer (Pelanggan)
 - **Menu & Kustomisasi:** Pilih menu ketoprak, atur level pedas (0-20), bawang putih, kekentalan bumbu
+- **Guest Checkout:** Pesan tanpa akun dengan nama dan nomor WhatsApp Indonesia
 - **Order Tracking:** Pantau status pesanan real-time (Menunggu → Nguleg → Siap Diambil)
 - **Pembayaran Digital:** UI untuk QRIS, GoPay, OVO, Dana
 
@@ -67,6 +68,10 @@ backend/                 # Hono API and database code
 ## 🚧 Status
 
 Backend API, PostgreSQL, authentication, and Socket.IO support are included. Payment gateway integration remains to be completed for production.
+
+### Production frontend configuration
+
+For a separately hosted frontend such as Vercel, configure `VITE_API_URL` with the HTTPS API base ending in `/api` and `VITE_SOCKET_URL` with the HTTPS backend origin. The repository intentionally contains no HTTP rewrite to the VPS. The Docker deployment uses same-origin Nginx proxying and does not require these variables.
 
 ## 📄 License
 

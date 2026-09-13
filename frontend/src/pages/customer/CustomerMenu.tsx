@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { ShoppingCart, Plus, Minus } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { ShoppingCart, Plus, Minus, Clock3, MapPin, Search, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { authApi, menuApi, ordersApi } from "@/lib/api"
+import { menuApi, ordersApi } from "@/lib/api"
+import { normalizeIndonesianPhone } from "@/lib/phone"
 import { menuItems as mockMenuItems } from "@/data/mock"
 
 interface MenuItem {
@@ -32,7 +33,7 @@ export function CustomerMenu() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
-  const [customization, setCustomization] = useState({
+  const [customization, setCustomization] = useState<CartItem["customization"]>({
     spiceLevel: 5,
     garlicAmount: "normal",
     sauceConsistency: "pas",
@@ -44,14 +45,11 @@ export function CustomerMenu() {
   const [orderType, setOrderType] = useState<"pickup" | "dine-in">("pickup")
   const [paymentMethod, setPaymentMethod] = useState<"qris" | "gopay" | "ovo" | "dana">("qris")
   const [customerName, setCustomerName] = useState("")
+  const [whatsappNumber, setWhatsappNumber] = useState("")
   const [checkoutError, setCheckoutError] = useState("")
   const navigate = useNavigate()
 
-  useEffect(() => {
-    fetchMenu()
-  }, [])
-
-  const fetchMenu = async () => {
+  async function fetchMenu() {
     try {
       setLoading(true)
       const data = await menuApi.getAvailable()
@@ -69,6 +67,10 @@ export function CustomerMenu() {
     }
   }
 
+  useEffect(() => {
+    fetchMenu()
+  }, [])
+
   const addToCart = () => {
     if (!selectedItem) return
     setCart([...cart, { menu: selectedItem, customization, quantity }])
@@ -82,24 +84,34 @@ export function CustomerMenu() {
     })
   }
 
+  const addSimpleItem = (menu: MenuItem) => {
+    setCart([...cart, {
+      menu,
+      customization: { spiceLevel: 0, garlicAmount: "normal", sauceConsistency: "pas", toppings: [] },
+      quantity: 1,
+    }])
+  }
+
   const removeFromCart = (index: number) => {
     setCart(cart.filter((_, i) => i !== index))
   }
 
-  const total = cart.reduce((sum, item) => sum + parseFloat(item.menu.price) * item.quantity, 0)
+  const total = cart.reduce((sum, item) => {
+    const toppingTotal = item.customization.toppings.reduce((subtotal, toppingId) => {
+      const topping = menuItems.find((menuItem) => String(menuItem.id) === toppingId)
+      return subtotal + (topping ? Number(topping.price) : 0)
+    }, 0)
+    return sum + (parseFloat(item.menu.price) + toppingTotal) * item.quantity
+  }, 0)
 
   const handleCheckout = async () => {
     if (!customerName.trim()) {
       setCheckoutError("Masukkan nama untuk pesanan Anda.")
       return
     }
-
-    try {
-      const user = await authApi.me()
-      if (user.role !== "customer") throw new Error()
-    } catch {
-      setCheckoutError("Silakan login sebagai pelanggan sebelum checkout.")
-      navigate("/customer/login")
+    const normalizedPhone = normalizeIndonesianPhone(whatsappNumber)
+    if (!normalizedPhone) {
+      setCheckoutError("Masukkan nomor WhatsApp Indonesia yang aktif.")
       return
     }
 
@@ -122,10 +134,11 @@ export function CustomerMenu() {
         paymentMethod,
       }
 
-      const order = await ordersApi.create(orderData)
+      const order = await ordersApi.createGuest({ ...orderData, whatsappNumber: normalizedPhone })
       
       // Navigate to tracking page with order ID
-      navigate(`/customer/tracking?orderId=${order.id}`)
+      sessionStorage.setItem(`trackingPhone:${order.trackingToken}`, normalizedPhone)
+      navigate(`/track/${order.trackingToken}`)
       setCart([])
     } catch (error) {
       console.error('Failed to create order:', error)
@@ -148,12 +161,25 @@ export function CustomerMenu() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="bg-primary text-primary-foreground p-6 shadow-md">
-        <h1 className="text-2xl font-bold">Warung Ketoprak Mas Edo</h1>
-        <p className="text-sm opacity-90">Pilih menu & kustomisasi ulekan</p>
+      <div className="sticky top-0 z-30 border-b bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+          <div><h1 className="text-xl font-black text-primary">Ketoprakin Aja</h1><p className="text-xs text-muted-foreground">Warung Ketoprak Mas Edo</p></div>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" asChild><Link to="/customer/tracking"><Search className="mr-1 h-4 w-4" />Lacak</Link></Button>
+            <Button variant="ghost" size="icon" asChild><Link aria-label="Akun pelanggan" to="/customer/account"><UserRound className="h-4 w-4" /></Link></Button>
+          </div>
+        </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="bg-primary px-6 py-7 text-primary-foreground shadow-md">
+        <div className="mx-auto max-w-4xl">
+          <p className="text-sm font-semibold uppercase tracking-wide opacity-80">Dibuat setelah kamu pesan</p>
+          <h2 className="mt-1 text-3xl font-black">Mau ketoprak level berapa hari ini?</h2>
+          <div className="mt-4 flex flex-wrap gap-4 text-sm"><span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-lime-300" /> Buka sekarang</span><span className="flex items-center gap-1"><Clock3 className="h-4 w-4" /> Siap ±15 menit</span><span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> Pick-up atau dine-in</span></div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl p-4 space-y-4">
         <h2 className="text-lg font-semibold">Menu Ketoprak</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {menuItems
@@ -191,7 +217,7 @@ export function CustomerMenu() {
                   <Button
                     size="sm"
                     className="w-full mt-2"
-                    onClick={() => setSelectedItem(item)}
+                    onClick={() => addSimpleItem(item)}
                   >
                     + Tambah
                   </Button>
@@ -200,6 +226,10 @@ export function CustomerMenu() {
             ))}
         </div>
       </div>
+
+      <footer className="mx-auto max-w-4xl px-4 pb-6 pt-10 text-center text-xs text-muted-foreground">
+        Pemilik warung? <Link className="underline hover:text-primary" to="/merchant/login">Masuk sebagai merchant</Link>
+      </footer>
 
       {selectedItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
@@ -287,6 +317,18 @@ export function CustomerMenu() {
                 </div>
               </div>
 
+              {menuItems.some((item) => item.category === "topping") && (
+                <div>
+                  <Label>Topping tambahan</Label>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {menuItems.filter((item) => item.category === "topping").map((topping) => {
+                      const selected = customization.toppings.includes(String(topping.id))
+                      return <Button key={topping.id} type="button" variant={selected ? "default" : "outline"} size="sm" onClick={() => setCustomization({ ...customization, toppings: selected ? customization.toppings.filter((id) => id !== String(topping.id)) : [...customization.toppings, String(topping.id)] })}>{topping.name}</Button>
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4">
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedItem(null)}>
                   Batal
@@ -354,6 +396,18 @@ export function CustomerMenu() {
                 placeholder="Contoh: Budi"
                 required
               />
+            </label>
+            <label className="block mb-3 text-sm space-y-1">
+              <span className="text-muted-foreground">Nomor WhatsApp</span>
+              <input
+                className="w-full rounded border p-2"
+                inputMode="tel"
+                value={whatsappNumber}
+                onChange={(event) => setWhatsappNumber(event.target.value)}
+                placeholder="Contoh: 0812-3456 7890"
+                required
+              />
+              {whatsappNumber && normalizeIndonesianPhone(whatsappNumber) && <span className="block text-xs text-emerald-700">Disimpan sebagai {normalizeIndonesianPhone(whatsappNumber)}</span>}
             </label>
             {checkoutError && <p className="mb-3 text-sm text-destructive">{checkoutError}</p>}
             <Button 

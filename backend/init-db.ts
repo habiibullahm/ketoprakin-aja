@@ -1,6 +1,9 @@
 import { db } from './src/db/index';
 import { sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
+
+const createTrackingToken = () => randomBytes(16).toString('base64url').slice(0, 21);
 
 async function initDatabase() {
   console.log('Initializing database...');
@@ -42,6 +45,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
         order_number VARCHAR(50) UNIQUE NOT NULL,
+        tracking_token VARCHAR(32) UNIQUE NOT NULL,
         customer_name VARCHAR(255) NOT NULL,
         customer_phone VARCHAR(20),
         user_id INTEGER REFERENCES users(id),
@@ -57,6 +61,13 @@ async function initDatabase() {
     `);
 
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)`);
+    await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_token VARCHAR(32)`);
+    const ordersWithoutTrackingToken = await db.execute(sql`SELECT id FROM orders WHERE tracking_token IS NULL`);
+    for (const order of ordersWithoutTrackingToken) {
+      await db.execute(sql`UPDATE orders SET tracking_token = ${createTrackingToken()} WHERE id = ${order.id}`);
+    }
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS orders_tracking_token_unique ON orders (tracking_token)`);
+    await db.execute(sql`ALTER TABLE orders ALTER COLUMN tracking_token SET NOT NULL`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS loyalty_stamps (
         id SERIAL PRIMARY KEY,

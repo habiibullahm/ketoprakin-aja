@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi, setToken } from '../../lib/api';
+import { authApi } from '../../lib/api';
 
 const DEMO_MERCHANT = {
   email: 'masedo@ketoprakin.com',
@@ -20,14 +20,13 @@ export default function MerchantLogin() {
     setLoading(true);
 
     try {
-      await authApi.login(email, password);
+      const result = await authApi.login(email, password);
+      if (result.user.role !== 'merchant') {
+        authApi.logout();
+        throw new Error('Gunakan akun pemilik atau merchant.');
+      }
       navigate('/merchant/kitchen');
     } catch (err) {
-      if (email === DEMO_MERCHANT.email && password === DEMO_MERCHANT.password) {
-        setToken('demo-merchant-token');
-        navigate('/merchant/kitchen');
-        return;
-      }
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);

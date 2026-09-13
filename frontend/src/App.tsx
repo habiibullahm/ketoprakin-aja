@@ -1,173 +1,79 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { CustomerMenu } from "@/pages/customer/CustomerMenu"
 import { OrderTracking } from "@/pages/customer/OrderTracking"
 import { CustomerLogin } from "@/pages/customer/Login"
 import { CustomerAccount } from "@/pages/customer/Account"
-import { CustomerOnboarding } from "@/pages/customer/Onboarding"
 import { KitchenDisplay } from "@/pages/merchant/KitchenDisplay"
 import { FinancialReport } from "@/pages/merchant/FinancialReport"
 import { StockManagement } from "@/pages/merchant/StockManagement"
 import { DebtBook } from "@/pages/merchant/DebtBook"
 import MerchantLogin from "@/pages/merchant/Login"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Home, ChefHat, DollarSign, Package, BookOpen, Utensils } from "lucide-react"
+import { authApi } from "@/lib/api"
+import { ChefHat, DollarSign, Package, BookOpen, Menu, X, Store } from "lucide-react"
 
-function HomePage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 to-primary/5 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center py-8">
-          <h1 className="text-4xl font-bold text-primary mb-2">Ketoprakin Aja</h1>
-          <p className="text-muted-foreground">Warung Ketoprak Mas Edo</p>
-        </div>
+const merchantLinks = [
+  { to: "/merchant/kitchen", label: "Kitchen", icon: ChefHat },
+  { to: "/merchant/stock", label: "Stok", icon: Package },
+  { to: "/merchant/financial", label: "Keuangan", icon: DollarSign },
+  { to: "/merchant/debt", label: "Kasbon", icon: BookOpen },
+]
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/customer">
-              <CardContent className="p-6 text-center">
-                <Utensils className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Pesan Menu</h2>
-                <p className="text-sm text-muted-foreground">
-                  Pilih menu & kustomisasi ulekan
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/customer/login">
-              <CardContent className="p-6 text-center">
-                <Utensils className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Akun Pelanggan</h2>
-                <p className="text-sm text-muted-foreground">Login, riwayat pesanan, dan stempel loyalitas</p>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/customer/tracking">
-              <CardContent className="p-6 text-center">
-                <Package className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Lacak Pesanan</h2>
-                <p className="text-sm text-muted-foreground">
-                  Pantau status pesanan Anda
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/merchant/login">
-              <CardContent className="p-6 text-center">
-                <ChefHat className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Kitchen Display</h2>
-                <p className="text-sm text-muted-foreground">
-                  Kelola pesanan masuk (Merchant)
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/merchant/login">
-              <CardContent className="p-6 text-center">
-                <DollarSign className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Laporan Keuangan</h2>
-                <p className="text-sm text-muted-foreground">
-                  Laba/rugi & settlement (Merchant)
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/merchant/login">
-              <CardContent className="p-6 text-center">
-                <Package className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Manajemen Stok</h2>
-                <p className="text-sm text-muted-foreground">
-                  Toggle ketersediaan menu (Merchant)
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <Link to="/merchant/login">
-              <CardContent className="p-6 text-center">
-                <BookOpen className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h2 className="text-xl font-bold mb-2">Buku Kasbon</h2>
-                <p className="text-sm text-muted-foreground">
-                  Catat utang pelanggan (Merchant)
-                </p>
-              </CardContent>
-            </Link>
-          </Card>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MerchantNav() {
+function MerchantShell() {
+  const [checking, setChecking] = useState(true)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const location = useLocation()
-  const isActive = (path: string) => location.pathname === path
+  const navigate = useNavigate()
 
-  return (
-    <div className="bg-white border-b sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2">
-            <Home className="h-5 w-5" />
-            <span className="font-bold">Ketoprakin Aja</span>
-          </Link>
-          <div className="flex gap-2">
-            <Button variant={isActive("/merchant/kitchen") ? "default" : "ghost"} size="sm" asChild>
-              <Link to="/merchant/kitchen">Kitchen</Link>
-            </Button>
-            <Button variant={isActive("/merchant/financial") ? "default" : "ghost"} size="sm" asChild>
-              <Link to="/merchant/financial">Keuangan</Link>
-            </Button>
-            <Button variant={isActive("/merchant/stock") ? "default" : "ghost"} size="sm" asChild>
-              <Link to="/merchant/stock">Stok</Link>
-            </Button>
-            <Button variant={isActive("/merchant/debt") ? "default" : "ghost"} size="sm" asChild>
-              <Link to="/merchant/debt">Kasbon</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    authApi.me().then((user) => {
+      if (user.role !== "merchant") throw new Error("Merchant access required")
+      setChecking(false)
+    }).catch(() => {
+      authApi.logout()
+      navigate("/merchant/login", { replace: true })
+    })
+  }, [navigate])
+
+  if (checking) return <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white">Memeriksa akses merchant...</div>
+
+  const nav = <nav className="space-y-2 p-4">
+    {merchantLinks.map(({ to, label, icon: Icon }) => <Button key={to} variant={location.pathname === to ? "default" : "ghost"} className="w-full justify-start" asChild onClick={() => setDrawerOpen(false)}><Link to={to}><Icon className="mr-3 h-5 w-5" />{label}</Link></Button>)}
+    <div className="pt-6"><Button variant="outline" className="w-full" onClick={() => { authApi.logout(); navigate("/merchant/login") }}>Logout</Button></div>
+  </nav>
+
+  return <div className="min-h-screen bg-gray-100 md:flex">
+    <aside className="hidden w-60 shrink-0 bg-white shadow md:block">
+      <Link to="/merchant/kitchen" className="flex h-16 items-center gap-2 border-b px-5 font-black text-primary"><Store className="h-5 w-5" />Ketoprakin Aja</Link>
+      {nav}
+    </aside>
+    <div className="min-w-0 flex-1">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white px-4 md:hidden">
+        <button aria-label="Buka menu merchant" onClick={() => setDrawerOpen(true)}><Menu className="h-6 w-6" /></button><b>Operasional Warung</b><span className="w-6" />
+      </header>
+      {drawerOpen && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Tutup menu merchant" className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} /><aside className="relative h-full w-72 bg-white shadow-xl"><div className="flex h-16 items-center justify-between border-b px-4"><b>Menu Merchant</b><button aria-label="Tutup menu" onClick={() => setDrawerOpen(false)}><X /></button></div>{nav}</aside></div>}
+      <Routes>
+        <Route path="kitchen" element={<KitchenDisplay />} />
+        <Route path="financial" element={<FinancialReport />} />
+        <Route path="stock" element={<StockManagement />} />
+        <Route path="debt" element={<DebtBook />} />
+        <Route path="*" element={<Navigate to="/merchant/kitchen" replace />} />
+      </Routes>
     </div>
-  )
+  </div>
 }
 
 export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/customer/menu" element={<CustomerMenu />} />
-        <Route path="/customer" element={<CustomerOnboarding />} />
-        <Route path="/customer/login" element={<CustomerLogin />} />
-        <Route path="/customer/account" element={<CustomerAccount />} />
-        <Route path="/customer/tracking" element={<OrderTracking />} />
-        <Route path="/merchant/login" element={<MerchantLogin />} />
-        <Route
-          path="/merchant/*"
-          element={
-            <>
-              <MerchantNav />
-              <Routes>
-                <Route path="kitchen" element={<KitchenDisplay />} />
-                <Route path="financial" element={<FinancialReport />} />
-                <Route path="stock" element={<StockManagement />} />
-                <Route path="debt" element={<DebtBook />} />
-              </Routes>
-            </>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
-  )
+  return <BrowserRouter><Routes>
+    <Route path="/" element={<CustomerMenu />} />
+    <Route path="/customer/menu" element={<Navigate to="/" replace />} />
+    <Route path="/customer" element={<Navigate to="/" replace />} />
+    <Route path="/customer/login" element={<CustomerLogin />} />
+    <Route path="/customer/account" element={<CustomerAccount />} />
+    <Route path="/customer/tracking" element={<OrderTracking />} />
+    <Route path="/track/:trackingToken" element={<OrderTracking />} />
+    <Route path="/merchant/login" element={<MerchantLogin />} />
+    <Route path="/merchant/*" element={<MerchantShell />} />
+  </Routes></BrowserRouter>
 }

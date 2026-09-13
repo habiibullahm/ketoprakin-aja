@@ -1,5 +1,5 @@
 import { Hono } from "hono"
-import { sign } from "jsonwebtoken"
+import { sign, verify } from "jsonwebtoken"
 import { hash, compare } from "bcryptjs"
 import { db } from "../db"
 import { users } from "../db/schema"
@@ -126,7 +126,6 @@ authRoutes.get("/me", async (c) => {
   }
 
   try {
-    const { verify } = await import("jsonwebtoken")
     const token = authHeader.substring(7)
     const decoded = verify(token, process.env.JWT_SECRET!) as { userId: number }
     

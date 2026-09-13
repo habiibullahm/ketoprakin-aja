@@ -1,25 +1,25 @@
-import { useState, useEffect } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useState, useEffect, useCallback } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Clock, ChefHat, PartyPopper } from "lucide-react"
+import { CheckCircle, Clock, ChefHat, PartyPopper, Copy, MessageCircle } from "lucide-react"
 import { ordersApi } from "@/lib/api"
 import { socket } from "@/lib/socket"
 
 interface OrderItem {
-  id: number
+  id?: number
   quantity: number
   spiceLevel: number
   garlicAmount: string
   sauceConsistency: string
   toppings: string | null
   price: string
-  menuItem: { id: number; name: string; price: string }
+  menuItem: { id?: number; name: string; price: string }
 }
 
 interface Order {
-  id: number
+  trackingToken: string
   orderNumber: string
   customerName: string
   orderType: string
@@ -32,46 +32,44 @@ interface Order {
 }
 
 export function OrderTracking() {
-  const [searchParams] = useSearchParams()
+  const { trackingToken } = useParams()
   const navigate = useNavigate()
-  const orderId = searchParams.get("orderId")
-  const [enteredOrderId, setEnteredOrderId] = useState("")
+  const [enteredTrackingToken, setEnteredTrackingToken] = useState("")
   const [order, setOrder] = useState<Order | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Boolean(trackingToken))
   const [error, setError] = useState("")
 
+  const fetchOrder = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await ordersApi.getByTrackingToken(trackingToken!)
+      setOrder(data)
+      setError("")
+    } catch {
+      setError("Link pelacakan tidak valid atau sudah tidak tersedia")
+    } finally {
+      setLoading(false)
+    }
+  }, [trackingToken])
+
   useEffect(() => {
-    if (orderId) {
+    if (trackingToken) {
       fetchOrder()
       socket.connect()
-      socket.emit("join-order", Number(orderId))
+      socket.emit("join-tracking", trackingToken)
       socket.on("order-status-update", fetchOrder)
       return () => {
         socket.off("order-status-update", fetchOrder)
         socket.disconnect()
       }
-    } else {
-      setLoading(false)
-      setError("No order ID provided")
     }
-  }, [orderId])
-
-  const fetchOrder = async () => {
-    try {
-      setLoading(true)
-      const data = await ordersApi.getById(parseInt(orderId!))
-      setOrder(data)
-    } catch {
-      setError("Failed to load order")
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [trackingToken, fetchOrder])
 
   const statusSteps = [
     { id: "menunggu", label: "Menunggu", icon: Clock },
     { id: "nguleg", label: "Nguleg Bumbu", icon: ChefHat },
     { id: "siap-diambil", label: "Siap Diambil", icon: CheckCircle },
+    { id: "selesai", label: "Sudah Diambil", icon: PartyPopper },
   ]
 
   if (loading) return (
@@ -83,32 +81,30 @@ export function OrderTracking() {
     </div>
   )
 
-  if (!orderId) return (
+  if (!trackingToken) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardContent className="p-6 space-y-4">
           <div className="text-center">
             <h1 className="text-xl font-bold">Lacak Pesanan</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Masukkan ID pesanan untuk melihat status terbaru.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Masukkan kode dari halaman konfirmasi atau pesan WhatsApp.</p>
           </div>
           <form
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault()
-              const id = Number(enteredOrderId)
-              if (Number.isInteger(id) && id > 0) navigate(`/customer/tracking?orderId=${id}`)
+              const token = enteredTrackingToken.trim()
+              if (/^[A-Za-z0-9_-]{16,32}$/.test(token)) navigate(`/track/${token}`)
             }}
           >
             <input
-              aria-label="ID Pesanan"
+              aria-label="Kode pelacakan"
               className="w-full rounded border p-2"
-              inputMode="numeric"
-              min="1"
-              onChange={(event) => setEnteredOrderId(event.target.value)}
-              placeholder="Contoh: 1"
+              onChange={(event) => setEnteredTrackingToken(event.target.value)}
+              placeholder="Contoh: k3T0p-9xY2qAbC123"
               required
-              type="number"
-              value={enteredOrderId}
+              type="text"
+              value={enteredTrackingToken}
             />
             <Button className="w-full" type="submit">Lacak Pesanan</Button>
           </form>
@@ -122,7 +118,7 @@ export function OrderTracking() {
       <Card className="max-w-md w-full">
         <CardContent className="p-6 text-center">
           <p className="text-destructive">{error || "Order not found"}</p>
-          <Button className="mt-4" variant="outline" onClick={() => navigate("/customer/tracking")}>Coba ID lain</Button>
+          <Button className="mt-4" variant="outline" onClick={() => navigate("/customer/tracking")}>Coba kode lain</Button>
         </CardContent>
       </Card>
     </div>
@@ -130,6 +126,9 @@ export function OrderTracking() {
 
   const currentStepIndex = statusSteps.findIndex((step) => step.id === order.status)
   const isReady = order.status === "siap-diambil"
+  const trackingUrl = window.location.href
+  const savedPhone = sessionStorage.getItem(`trackingPhone:${order.trackingToken}`)?.replace("+", "")
+  const shareText = `Halo! Pesanan ${order.orderNumber} sudah diterima Mas Edo. Pantau status ngulegnya di sini: ${trackingUrl}`
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -194,8 +193,8 @@ export function OrderTracking() {
           <CardContent className="p-6">
             <h3 className="font-semibold mb-3">Detail Pesanan</h3>
             <div className="space-y-2">
-              {order.orderItems.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
+              {order.orderItems.map((item, index) => (
+                <div key={`${item.menuItem.name}-${index}`} className="flex justify-between text-sm">
                   <span>{item.quantity}x {item.menuItem.name}</span>
                   <span className="font-medium">Rp {(parseFloat(item.price) * item.quantity).toLocaleString("id-ID")}</span>
                 </div>
@@ -208,7 +207,13 @@ export function OrderTracking() {
           </CardContent>
         </Card>
 
-        <Button onClick={() => window.location.href = "/"} className="w-full">Kembali ke Beranda</Button>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+            <a href={`https://wa.me/${savedPhone ?? ""}?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer"><MessageCircle className="mr-2 h-4 w-4" />Simpan ke WhatsApp</a>
+          </Button>
+          <Button variant="outline" onClick={() => navigator.clipboard.writeText(trackingUrl)}><Copy className="mr-2 h-4 w-4" />Salin link</Button>
+        </div>
+        <Button onClick={() => window.location.href = "/"} variant="outline" className="w-full">Pesan Lagi</Button>
       </div>
     </div>
   )

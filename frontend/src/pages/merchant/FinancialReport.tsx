@@ -18,6 +18,7 @@ export function FinancialReport() {
   const [monthlyExpenses, setMonthlyExpenses] = useState(0)
   const [newExpense, setNewExpense] = useState({ category: "bahan-baku", description: "", amount: "" })
   const [settlementDone, setSettlementDone] = useState(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     Promise.all([ordersApi.getAll(), expensesApi.getToday(), expensesApi.getAll()])
@@ -67,10 +68,12 @@ export function FinancialReport() {
       description: newExpense.description, amount: Number(newExpense.amount), date: new Date(),
     }
     try {
+      setError("")
       const created = await expensesApi.create(newExpense)
       setExpenses([...expenses, { ...draft, id: String(created.id), date: new Date(created.date) }])
-    } catch {
-      setExpenses([...expenses, draft])
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Pengeluaran gagal disimpan")
+      return
     }
     setNewExpense({ category: "bahan-baku", description: "", amount: "" })
   }
@@ -78,9 +81,12 @@ export function FinancialReport() {
   const deleteExpense = async (id: string) => {
     if (!confirm("Hapus pengeluaran ini?")) return
     try {
+      setError("")
       await expensesApi.delete(Number(id))
-    } catch { /* offline fallback — remove locally anyway */ }
-    setExpenses(expenses.filter((e) => e.id !== id))
+      setExpenses(expenses.filter((e) => e.id !== id))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Pengeluaran gagal dihapus")
+    }
   }
 
   const handleSettlement = () => {
@@ -96,6 +102,7 @@ export function FinancialReport() {
           <h1 className="text-2xl font-bold">Laporan Keuangan</h1>
           <p className="text-muted-foreground">Ringkasan laba/rugi hari ini</p>
         </div>
+        {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}. Silakan coba lagi.</p>}
 
         {/* Daily summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

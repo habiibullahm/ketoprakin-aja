@@ -32,12 +32,11 @@ export const authMiddleware = async (c: Context, next: Next) => {
 }
 
 export const merchantMiddleware = async (c: Context, next: Next) => {
-  await authMiddleware(c, (async () => {
+  return authMiddleware(c, (async () => {
     const user = (c as any).get("user") as { role: string }
     if (user.role !== "merchant") {
-      c.json({ error: "Merchant access required" }, 403)
-      return
+      return c.json({ error: "Merchant access required" }, 403)
     }
-    await next()
+    return next()
   }) as Next)
 }

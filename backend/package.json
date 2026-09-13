@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:init": "tsx init-db.ts"
+    "db:init": "tsx init-db.ts",
+    "test": "tsx --test src/lib/*.test.ts"
   },
   "keywords": [],
   "author": "",

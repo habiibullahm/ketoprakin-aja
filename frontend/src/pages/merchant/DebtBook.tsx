@@ -14,6 +14,7 @@ export function DebtBook() {
   useAuthGuard()
   const [debts, setDebts] = useState<Debt[]>(mockDebts)
   const [newDebt, setNewDebt] = useState({ customerName: "", amount: "", note: "" })
+  const [error, setError] = useState("")
 
   useEffect(() => {
     debtsApi.getAll()
@@ -28,10 +29,12 @@ export function DebtBook() {
     if (!newDebt.customerName || !newDebt.amount) return
     const draft = { id: `D${Date.now()}`, customerName: newDebt.customerName, amount: Number(newDebt.amount), date: new Date(), paid: false, note: newDebt.note || undefined }
     try {
+      setError("")
       const created = await debtsApi.create(newDebt)
       setDebts([...debts, { ...draft, id: String(created.id), date: new Date(created.createdAt) }])
-    } catch {
-      setDebts([...debts, draft])
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Kasbon gagal disimpan")
+      return
     }
     setNewDebt({ customerName: "", amount: "", note: "" })
   }
@@ -40,17 +43,23 @@ export function DebtBook() {
     const debt = debts.find((item) => item.id === id)
     if (!debt) return
     try {
+      setError("")
       const updated = debt.paid ? await debtsApi.markAsUnpaid(Number(id)) : await debtsApi.markAsPaid(Number(id))
       setDebts(debts.map((item) => item.id === id ? { ...item, paid: updated.paid } : item))
-    } catch {
-      setDebts(debts.map((item) => item.id === id ? { ...item, paid: !item.paid } : item))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Status kasbon gagal diubah")
     }
   }
 
   const deleteDebt = async (id: string) => {
     if (!confirm("Hapus kasbon ini?")) return
-    try { await debtsApi.delete(Number(id)) } catch { /* offline fallback */ }
-    setDebts(debts.filter((item) => item.id !== id))
+    try {
+      setError("")
+      await debtsApi.delete(Number(id))
+      setDebts(debts.filter((item) => item.id !== id))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Kasbon gagal dihapus")
+    }
   }
 
   const unpaidTotal = debts.filter((d) => !d.paid).reduce((sum, d) => sum + d.amount, 0)
@@ -62,6 +71,7 @@ export function DebtBook() {
           <h1 className="text-2xl font-bold">Buku Kasbon</h1>
           <p className="text-muted-foreground">Catat utang pelanggan</p>
         </div>
+        {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}. Silakan coba lagi.</p>}
 
         <Card className="bg-orange-50 border-orange-200">
           <CardContent className="p-6">
