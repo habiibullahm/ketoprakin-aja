@@ -1,4 +1,4 @@
-const CACHE = "ketoprakin-v1"
+const CACHE = "ketoprakin-v2"
 const APP_SHELL = ["/", "/manifest.json", "/favicon.svg"]
 
 self.addEventListener("install", (event) => {
