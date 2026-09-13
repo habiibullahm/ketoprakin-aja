@@ -73,7 +73,9 @@ Backend API, PostgreSQL, authentication, and Socket.IO support are included. Pay
 
 Production URL: `https://ketoprakin-aja.vercel.app`
 
-For a separately hosted frontend such as Vercel, configure `VITE_API_URL` with the HTTPS API base ending in `/api` and `VITE_SOCKET_URL` with the HTTPS backend origin. The repository intentionally contains no HTTP rewrite to the VPS. The Docker deployment uses same-origin Nginx proxying and does not require these variables.
+The temporary Vercel deployment uses same-origin external rewrites for `/api/*` and `/socket.io/*` to the VPS, so `VITE_API_URL` and `VITE_SOCKET_URL` remain unset. This avoids browser mixed-content and CORS errors, but the Vercel-to-VPS hop remains HTTP until a backend domain with TLS is configured. The Docker deployment also uses same-origin Nginx proxying.
+
+When the backend has an HTTPS domain, remove the external rewrites and configure `VITE_API_URL` with the HTTPS API base ending in `/api` and `VITE_SOCKET_URL` with the HTTPS backend origin.
 
 Pushes to `master` are automatically linted, built, and deployed to the Vercel production project `ketoprakin-aja` by `.github/workflows/deploy-vercel.yml`. Configure the repository Actions secret `VERCEL_TOKEN` with a Vercel access token that can deploy this project.
 
