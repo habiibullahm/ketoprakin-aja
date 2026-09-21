@@ -37,3 +37,4 @@ docker-compose.override.yml
 *.db
 *.sqlite
 *.sqlite3
+.vercel
