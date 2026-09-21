@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { db } from "../db"
 import { orders, orderItems, menuItems, loyaltyStamps, users } from "../db/schema"
-import { and, eq, desc, ne } from "drizzle-orm"
+import { and, desc, eq, gte, inArray, ne, sql } from "drizzle-orm"
 import { z } from "zod"
 import { authMiddleware, merchantMiddleware } from "../middleware/auth"
 import { getIo } from "../lib/socket"
@@ -9,17 +9,18 @@ import { randomBytes } from "node:crypto"
 import { verify } from "jsonwebtoken"
 import { normalizeIndonesianWhatsAppNumber } from "../lib/phone"
 import { getOrderNotifier } from "../lib/notifier"
+import { aggregateInventoryRequirements, type InventoryRequirement } from "../lib/inventory"
 
 const orderRoutes = new Hono()
 
 // Validation schema
 const orderItemSchema = z.object({
-  menuId: z.number(),
-  quantity: z.number().min(1),
+  menuId: z.number().int().positive(),
+  quantity: z.number().int().positive(),
   spiceLevel: z.number().min(0).max(20).optional(),
   garlicAmount: z.enum(["sedikit", "normal", "banyak"]).optional(),
   sauceConsistency: z.enum(["encer", "pas", "kental"]).optional(),
-  toppings: z.array(z.string()).optional(),
+  toppings: z.array(z.coerce.number().int().positive()).optional(),
 })
 
 const createOrderSchema = z.object({
@@ -45,6 +46,116 @@ const orderActionSchema = z.object({
 })
 
 const createTrackingToken = () => randomBytes(16).toString("base64url").slice(0, 21)
+
+type CheckoutItem = z.infer<typeof orderItemSchema>
+type PreparedOrderItem = {
+  menuId: number
+  quantity: number
+  spiceLevel: number
+  garlicAmount: string
+  sauceConsistency: string
+  toppings: string | null
+  price: string
+}
+
+type PreparedOrder = {
+  itemsData: PreparedOrderItem[]
+  menuById: Map<number, typeof menuItems.$inferSelect>
+  requirements: InventoryRequirement[]
+  totalAmount: number
+}
+
+class InventoryUnavailableError extends Error {
+  constructor(readonly unavailableItems: Array<{ menuId: number; name: string; requested: number; available: number }>) {
+    super("Stok tidak cukup")
+  }
+}
+
+class OrderValidationError extends Error {}
+
+async function prepareOrder(items: CheckoutItem[]): Promise<PreparedOrder> {
+  const requirements = aggregateInventoryRequirements(items)
+  const catalog = await db.query.menuItems.findMany({
+    where: inArray(menuItems.id, requirements.map((requirement) => requirement.menuId)),
+  })
+  const menuById = new Map(catalog.map((item) => [item.id, item]))
+  let totalAmount = 0
+  const itemsData: PreparedOrderItem[] = []
+
+  for (const item of items) {
+    const menuItem = menuById.get(item.menuId)
+    if (!menuItem || !menuItem.available || menuItem.category === "topping") {
+      throw new OrderValidationError(`Menu item ${item.menuId} tidak tersedia`)
+    }
+    if (menuItem.category !== "ketoprak" && (item.toppings?.length ?? 0) > 0) {
+      throw new OrderValidationError("Topping hanya dapat ditambahkan ke menu ketoprak")
+    }
+
+    const toppingNames: string[] = []
+    let toppingTotal = 0
+    for (const toppingId of item.toppings ?? []) {
+      const topping = menuById.get(toppingId)
+      if (!topping || topping.category !== "topping" || !topping.available) {
+        throw new OrderValidationError(`Topping ${toppingId} tidak tersedia`)
+      }
+      toppingNames.push(topping.name)
+      toppingTotal += Number(topping.price)
+    }
+
+    const price = Number(menuItem.price)
+    totalAmount += (price + toppingTotal) * item.quantity
+    itemsData.push({
+      menuId: item.menuId,
+      quantity: item.quantity,
+      spiceLevel: item.spiceLevel ?? 5,
+      garlicAmount: item.garlicAmount ?? "normal",
+      sauceConsistency: item.sauceConsistency ?? "pas",
+      toppings: toppingNames.length ? JSON.stringify(toppingNames) : null,
+      price: price.toString(),
+    })
+  }
+
+  const unavailableItems = requirements.flatMap((requirement) => {
+    const item = menuById.get(requirement.menuId)
+    return item && item.stockQuantity < requirement.quantity
+      ? [{ menuId: item.id, name: item.name, requested: requirement.quantity, available: item.stockQuantity }]
+      : []
+  })
+  if (unavailableItems.length) throw new InventoryUnavailableError(unavailableItems)
+
+  return { itemsData, menuById, requirements, totalAmount }
+}
+
+async function decrementInventory(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  requirements: InventoryRequirement[],
+  menuById: Map<number, typeof menuItems.$inferSelect>,
+) {
+  for (const requirement of requirements) {
+    const [updated] = await tx
+      .update(menuItems)
+      .set({
+        stockQuantity: sql`${menuItems.stockQuantity} - ${requirement.quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(menuItems.id, requirement.menuId),
+        eq(menuItems.available, true),
+        gte(menuItems.stockQuantity, requirement.quantity),
+      ))
+      .returning({ id: menuItems.id })
+
+    if (!updated) {
+      const item = menuById.get(requirement.menuId)
+      throw new InventoryUnavailableError([{
+        menuId: requirement.menuId,
+        name: item?.name ?? `Menu ${requirement.menuId}`,
+        requested: requirement.quantity,
+        available: item?.stockQuantity ?? 0,
+      }])
+    }
+  }
+}
 
 const guestRateLimits = new Map<string, number[]>()
 const isRateLimited = (key: string, max: number, windowMs: number) => {
@@ -194,48 +305,11 @@ orderRoutes.post("/guest", async (c) => {
     }
 
     const customer = await optionalCustomer(c.req.header("Authorization"))
-    let totalAmount = 0
-    const itemsData: Array<{
-      menuId: number
-      quantity: number
-      spiceLevel: number
-      garlicAmount: string
-      sauceConsistency: string
-      toppings: string | null
-      price: string
-    }> = []
-    for (const item of validated.items) {
-      const menuItem = await db.query.menuItems.findFirst({ where: eq(menuItems.id, item.menuId) })
-      if (!menuItem || !menuItem.available || menuItem.category === "topping") {
-        return c.json({ error: `Menu item ${item.menuId} tidak tersedia` }, 400)
-      }
-      if (menuItem.category !== "ketoprak" && (item.toppings?.length ?? 0) > 0) {
-        return c.json({ error: "Topping hanya dapat ditambahkan ke menu ketoprak" }, 400)
-      }
-      const price = Number(menuItem.price)
-      totalAmount += price * item.quantity
-      const toppingNames: string[] = []
-      for (const toppingId of item.toppings ?? []) {
-        const topping = await db.query.menuItems.findFirst({ where: eq(menuItems.id, Number(toppingId)) })
-        if (!topping || topping.category !== "topping" || !topping.available) {
-          return c.json({ error: `Topping ${toppingId} tidak tersedia` }, 400)
-        }
-        toppingNames.push(topping.name)
-        totalAmount += Number(topping.price) * item.quantity
-      }
-      itemsData.push({
-        menuId: item.menuId,
-        quantity: item.quantity,
-        spiceLevel: item.spiceLevel ?? 5,
-        garlicAmount: item.garlicAmount ?? "normal",
-        sauceConsistency: item.sauceConsistency ?? "pas",
-        toppings: toppingNames.length ? JSON.stringify(toppingNames) : null,
-        price: price.toString(),
-      })
-    }
+    const preparedOrder = await prepareOrder(validated.items)
 
     const trackingToken = createTrackingToken()
     const completeOrder = await db.transaction(async (tx) => {
+      await decrementInventory(tx, preparedOrder.requirements, preparedOrder.menuById)
       const [newOrder] = await tx.insert(orders).values({
         orderNumber: generateOrderNumber(),
         trackingToken,
@@ -243,12 +317,12 @@ orderRoutes.post("/guest", async (c) => {
         customerPhone,
         userId: customer?.id,
         orderType: validated.orderType,
-        totalAmount: totalAmount.toString(),
+        totalAmount: preparedOrder.totalAmount.toString(),
         paymentMethod: validated.paymentMethod,
         paymentStatus: "pending",
         notes: validated.notes,
       }).returning()
-      await tx.insert(orderItems).values(itemsData.map((item) => ({ orderId: newOrder.id, ...item })))
+      await tx.insert(orderItems).values(preparedOrder.itemsData.map((item) => ({ orderId: newOrder.id, ...item })))
       return tx.query.orders.findFirst({
         where: eq(orders.id, newOrder.id),
         with: { orderItems: { with: { menuItem: true } } },
@@ -268,6 +342,8 @@ orderRoutes.post("/guest", async (c) => {
     return c.json(publicOrder(completeOrder), 201)
   } catch (error) {
     if (error instanceof z.ZodError) return c.json({ error: error.issues }, 400)
+    if (error instanceof OrderValidationError) return c.json({ error: error.message }, 400)
+    if (error instanceof InventoryUnavailableError) return c.json({ error: error.message, unavailableItems: error.unavailableItems }, 409)
     if (error instanceof Error && error.message.includes("WhatsApp")) return c.json({ error: error.message }, 400)
     console.error("Guest order error", error instanceof Error ? error.message : String(error))
     return c.json({ error: "Gagal membuat pesanan" }, 500)
@@ -282,81 +358,43 @@ orderRoutes.post("/", authMiddleware, async (c) => {
     const user = (c as any).get("user") as { id: number; role: string; name: string }
     if (user.role !== "customer") return c.json({ error: "Customer account required" }, 403)
 
-    // Calculate total and prepare order items
-    let totalAmount = 0
-    const itemsData = []
+    const preparedOrder = await prepareOrder(validated.items)
 
-    for (const item of validated.items) {
-      const menuItem = await db.query.menuItems.findFirst({
-        where: eq(menuItems.id, item.menuId),
-      })
-
-      if (!menuItem) {
-        return c.json({ error: `Menu item ${item.menuId} not found` }, 400)
-      }
-
-      const price = parseFloat(menuItem.price)
-      const itemTotal = price * item.quantity
-      totalAmount += itemTotal
-
-      itemsData.push({
-        menuId: item.menuId,
-        quantity: item.quantity,
-        spiceLevel: item.spiceLevel ?? 5,
-        garlicAmount: item.garlicAmount || "normal",
-        sauceConsistency: item.sauceConsistency || "pas",
-        toppings: item.toppings ? JSON.stringify(item.toppings) : null,
-        price: price.toString(),
-      })
-    }
-
-    // Create order
     const orderNumber = generateOrderNumber()
-    const [newOrder] = await db
-      .insert(orders)
-      .values({
-        orderNumber,
-        trackingToken: createTrackingToken(),
-        customerName: validated.customerName,
-        userId: user.id,
-        customerPhone: validated.customerPhone,
-        orderType: validated.orderType,
-        totalAmount: totalAmount.toString(),
-        paymentMethod: validated.paymentMethod,
-        paymentStatus: "pending",
-        notes: validated.notes,
+    const completeOrder = await db.transaction(async (tx) => {
+      await decrementInventory(tx, preparedOrder.requirements, preparedOrder.menuById)
+      const [newOrder] = await tx
+        .insert(orders)
+        .values({
+          orderNumber,
+          trackingToken: createTrackingToken(),
+          customerName: validated.customerName,
+          userId: user.id,
+          customerPhone: validated.customerPhone,
+          orderType: validated.orderType,
+          totalAmount: preparedOrder.totalAmount.toString(),
+          paymentMethod: validated.paymentMethod,
+          paymentStatus: "pending",
+          notes: validated.notes,
+        })
+        .returning()
+      await tx.insert(orderItems).values(preparedOrder.itemsData.map((item) => ({ orderId: newOrder.id, ...item })))
+      return tx.query.orders.findFirst({
+        where: eq(orders.id, newOrder.id),
+        with: { orderItems: { with: { menuItem: true } } },
       })
-      .returning()
-
-    // Create order items
-    for (const item of itemsData) {
-      await db.insert(orderItems).values({
-        orderId: newOrder.id,
-        ...item,
-      })
-    }
+    })
+    if (!completeOrder) throw new Error("Order creation failed")
 
     // Emit socket event for real-time KDS update
     const io = getIo()
     io.to("kitchen").emit("new-order", {
-      orderId: newOrder.id,
-      orderNumber: newOrder.orderNumber,
-      customerName: newOrder.customerName,
-      orderType: newOrder.orderType,
-      totalAmount: newOrder.totalAmount,
-      status: newOrder.status,
-    })
-
-    // Fetch complete order with items
-    const completeOrder = await db.query.orders.findFirst({
-      where: eq(orders.id, newOrder.id),
-      with: {
-        orderItems: {
-          with: {
-            menuItem: true,
-          },
-        },
-      },
+      orderId: completeOrder.id,
+      orderNumber: completeOrder.orderNumber,
+      customerName: completeOrder.customerName,
+      orderType: completeOrder.orderType,
+      totalAmount: completeOrder.totalAmount,
+      status: completeOrder.status,
     })
 
     return c.json(completeOrder, 201)
@@ -364,6 +402,8 @@ orderRoutes.post("/", authMiddleware, async (c) => {
     if (error instanceof z.ZodError) {
       return c.json({ error: error.issues }, 400)
     }
+    if (error instanceof OrderValidationError) return c.json({ error: error.message }, 400)
+    if (error instanceof InventoryUnavailableError) return c.json({ error: error.message, unavailableItems: error.unavailableItems }, 409)
     const errMsg = error instanceof Error ? error.message : String(error)
     console.error("Create order error:", errMsg)
     return c.json({ error: "Failed to create order", details: errMsg }, 500)

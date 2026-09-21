@@ -12,6 +12,8 @@ export interface ApiMenuItem {
   category: "ketoprak" | "topping" | "minuman"
   image: string
   available: boolean
+  stockQuantity: number
+  lowStockThreshold: number
   createdAt: string
   updatedAt: string
 }
@@ -87,4 +89,4 @@ export interface CreateExpenseInput { category: ExpenseCategory; description: st
 export interface UpdateExpenseInput { category?: ExpenseCategory; description?: string; amount?: string; date?: string }
 export interface CreateDebtInput { customerName: string; customerPhone?: string; amount: string; note?: string }
 export interface CreateOrderInput { customerName: string; customerPhone?: string; orderType: OrderType; paymentMethod: PaymentMethod; notes?: string; items: Array<{ menuId: number; quantity: number; spiceLevel: number; garlicAmount: string; sauceConsistency: string; toppings: string[] }> }
-export interface MenuItemInput { name: string; description?: string; price: number | string; category: "ketoprak" | "topping" | "minuman"; image?: string; available?: boolean }
+export interface MenuItemInput { name: string; description?: string; price: number | string; category: "ketoprak" | "topping" | "minuman"; image?: string; available?: boolean; stockQuantity?: number; lowStockThreshold?: number }

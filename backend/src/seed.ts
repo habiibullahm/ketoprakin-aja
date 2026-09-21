@@ -33,6 +33,8 @@ async function seed() {
       category: "ketoprak",
       image: "https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 30,
+      lowStockThreshold: 5,
     },
     {
       name: "Ketoprak Telur",
@@ -41,6 +43,8 @@ async function seed() {
       category: "ketoprak",
       image: "https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 30,
+      lowStockThreshold: 5,
     },
     {
       name: "Ketoprak Spesial",
@@ -49,6 +53,8 @@ async function seed() {
       category: "ketoprak",
       image: "https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 30,
+      lowStockThreshold: 5,
     },
     {
       name: "Extra Tahu",
@@ -57,6 +63,8 @@ async function seed() {
       category: "topping",
       image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 50,
+      lowStockThreshold: 5,
     },
     {
       name: "Extra Kerupuk",
@@ -65,6 +73,8 @@ async function seed() {
       category: "topping",
       image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 50,
+      lowStockThreshold: 5,
     },
     {
       name: "Es Teh Manis",
@@ -73,6 +83,8 @@ async function seed() {
       category: "minuman",
       image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 20,
+      lowStockThreshold: 5,
     },
     {
       name: "Es Jeruk",
@@ -81,6 +93,8 @@ async function seed() {
       category: "minuman",
       image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop",
       available: true,
+      stockQuantity: 20,
+      lowStockThreshold: 5,
     },
   ]
 
