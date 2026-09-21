@@ -6,6 +6,7 @@ import { orderRoutes } from "./routes/orders"
 import { expenseRoutes } from "./routes/expenses"
 import { debtRoutes } from "./routes/debts"
 import { customerRoutes } from "./routes/customer"
+import { merchantRoutes } from "./routes/merchant"
 import { setIo } from "./lib/socket"
 import { cors } from "hono/cors"
 
@@ -23,6 +24,7 @@ app.route("/api/orders", orderRoutes)
 app.route("/api/expenses", expenseRoutes)
 app.route("/api/debts", debtRoutes)
 app.route("/api/customer", customerRoutes)
+app.route("/api/merchant", merchantRoutes)
 
 app.get("/health", (c) => c.json({ status: "ok" }))
 

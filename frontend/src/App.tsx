@@ -11,7 +11,7 @@ import { DebtBook } from "@/pages/merchant/DebtBook"
 import MerchantLogin from "@/pages/merchant/Login"
 import { Button } from "@/components/ui/button"
 import { authApi } from "@/lib/api"
-import { ChefHat, DollarSign, Package, BookOpen, Menu, X, Store } from "lucide-react"
+import { ChefHat, DollarSign, Package, BookOpen, Menu, X } from "lucide-react"
 
 const merchantLinks = [
   { to: "/merchant/kitchen", label: "Kitchen", icon: ChefHat },
@@ -36,23 +36,23 @@ function MerchantShell() {
     })
   }, [navigate])
 
-  if (checking) return <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white">Memeriksa akses merchant...</div>
+  if (checking) return <div className="flex min-h-screen items-center justify-center bg-[#f7f1e6] text-[#17231c]">Memeriksa akses merchant...</div>
 
-  const nav = <nav className="space-y-2 p-4">
-    {merchantLinks.map(({ to, label, icon: Icon }) => <Button key={to} variant={location.pathname === to ? "default" : "ghost"} className="w-full justify-start" asChild onClick={() => setDrawerOpen(false)}><Link to={to}><Icon className="mr-3 h-5 w-5" />{label}</Link></Button>)}
-    <div className="pt-6"><Button variant="outline" className="w-full" onClick={() => { authApi.logout(); navigate("/merchant/login") }}>Logout</Button></div>
+  const nav = (mobile = false) => <nav className={`space-y-2 overflow-y-auto p-4 ${mobile ? "text-[#17231c]" : ""}`}>
+    {merchantLinks.map(({ to, label, icon: Icon }) => <Link key={to} to={to} onClick={() => setDrawerOpen(false)} className={`flex min-h-11 w-full items-center rounded-xl px-4 text-sm font-medium transition-colors ${mobile ? (location.pathname === to ? "bg-[#e8dfd0] text-[#315c3b]" : "text-[#17231c] hover:bg-[#f7f1e6]") : (location.pathname === to ? "bg-white/15 text-white" : "text-white/75 hover:bg-white/10 hover:text-white")}`}><Icon className="mr-3 h-5 w-5" />{label}</Link>)}
+    <div className="pt-6"><Button variant="outline" className={`w-full ${mobile ? "border-[#d9d0c0] bg-white text-[#17231c] hover:bg-[#f7f1e6]" : "border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"}`} onClick={() => { authApi.logout(); navigate("/merchant/login") }}>Logout</Button></div>
   </nav>
 
-  return <div className="min-h-screen bg-gray-100 md:flex">
-    <aside className="hidden w-60 shrink-0 bg-white shadow md:block">
-      <Link to="/merchant/kitchen" className="flex h-16 items-center gap-2 border-b px-5 font-black text-primary"><Store className="h-5 w-5" />Ketoprakin Aja</Link>
-      {nav}
+  return <div className="min-h-screen bg-[#f7f1e6] md:flex">
+    <aside className="hidden h-screen w-64 shrink-0 bg-[#315c3b] text-white md:sticky md:top-0 md:block">
+      <Link to="/merchant/kitchen" className="flex h-20 items-center gap-3 border-b border-white/10 px-5 font-black"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e7b65a] text-xl text-[#17231c]">K</span><span><span className="block">Ketoprakin Aja</span><small className="font-normal text-white/60">Merchant console</small></span></Link>
+      {nav()}
     </aside>
     <div className="min-w-0 flex-1">
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white px-4 md:hidden">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#d9d0c0] bg-[#f7f1e6] px-4 md:hidden">
         <button aria-label="Buka menu merchant" onClick={() => setDrawerOpen(true)}><Menu className="h-6 w-6" /></button><b>Operasional Warung</b><span className="w-6" />
       </header>
-      {drawerOpen && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Tutup menu merchant" className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} /><aside className="relative h-full w-72 bg-white shadow-xl"><div className="flex h-16 items-center justify-between border-b px-4"><b>Menu Merchant</b><button aria-label="Tutup menu" onClick={() => setDrawerOpen(false)}><X /></button></div>{nav}</aside></div>}
+      {drawerOpen && <div className="fixed inset-0 z-50 md:hidden"><button aria-label="Tutup menu merchant" className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} /><aside className="relative flex h-full w-[min(18rem,86vw)] flex-col bg-white shadow-xl"><div className="flex h-16 shrink-0 items-center justify-between border-b px-4"><b>Menu Merchant</b><button aria-label="Tutup menu" onClick={() => setDrawerOpen(false)}><X /></button></div>{nav(true)}</aside></div>}
       <Routes>
         <Route path="kitchen" element={<KitchenDisplay />} />
         <Route path="financial" element={<FinancialReport />} />

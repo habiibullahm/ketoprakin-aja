@@ -1,76 +1,52 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, DollarSign, Wallet, Trash2, Calendar } from "lucide-react"
-import { mockExpenses } from "@/data/mock"
 import type { Expense } from "@/types"
-import { expensesApi, ordersApi } from "@/lib/api"
+import { expensesApi, merchantApi } from "@/lib/api"
 import { useAuthGuard } from "@/lib/useAuthGuard"
+import type { ExpenseCategory } from "@/types/api"
 
 export function FinancialReport() {
   useAuthGuard()
-  const [expenses, setExpenses] = useState<Expense[]>(mockExpenses)
+  const [expenses, setExpenses] = useState<Expense[]>([])
   const [dailyRevenue, setDailyRevenue] = useState(0)
+  const [dailyExpensesTotal, setDailyExpensesTotal] = useState(0)
   const [monthlyRevenue, setMonthlyRevenue] = useState(0)
   const [monthlyExpenses, setMonthlyExpenses] = useState(0)
-  const [newExpense, setNewExpense] = useState({ category: "bahan-baku", description: "", amount: "" })
+  const [newExpense, setNewExpense] = useState<{ category: ExpenseCategory; description: string; amount: string }>({ category: "bahan-baku", description: "", amount: "" })
   const [settlementDone, setSettlementDone] = useState(false)
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    Promise.all([ordersApi.getAll(), expensesApi.getToday(), expensesApi.getAll()])
-      .then(([orders, apiExpenses, allExpenses]) => {
-        const today = new Date().toDateString()
-        const thisMonth = new Date().getMonth()
-        const thisYear = new Date().getFullYear()
-        setDailyRevenue(
-          orders
-            .filter((o) => new Date(o.createdAt).toDateString() === today && o.paymentStatus === "paid")
-            .reduce((s, o) => s + Number(o.totalAmount), 0)
-        )
-        setMonthlyRevenue(
-          orders
-            .filter((o) => {
-              const d = new Date(o.createdAt)
-              return d.getMonth() === thisMonth && d.getFullYear() === thisYear && o.paymentStatus === "paid"
-            })
-            .reduce((s, o) => s + Number(o.totalAmount), 0)
-        )
-        setMonthlyExpenses(
-          allExpenses
-            .filter((expense) => {
-              const date = new Date(expense.date)
-              return date.getMonth() === thisMonth && date.getFullYear() === thisYear
-            })
-            .reduce((sum, expense) => sum + Number(expense.amount), 0)
-        )
-        setExpenses(
-          apiExpenses.map((e: any) => ({
-            id: String(e.id), category: e.category, description: e.description,
-            amount: Number(e.amount), date: new Date(e.date),
-          }))
-        )
-      })
-      .catch(() => undefined)
+  const refreshReport = useCallback(async () => {
+    const [dashboard, apiExpenses] = await Promise.all([merchantApi.getDashboard(), expensesApi.getToday()])
+    setDailyRevenue(dashboard.todayRevenue)
+    setDailyExpensesTotal(dashboard.todayExpenses)
+    setMonthlyRevenue(dashboard.monthRevenue)
+    setMonthlyExpenses(dashboard.monthExpenses)
+    setExpenses(apiExpenses.map((expense) => ({
+      id: String(expense.id), category: expense.category, description: expense.description,
+      amount: Number(expense.amount), date: new Date(expense.date),
+    })))
   }, [])
 
-  const dailyExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+  useEffect(() => {
+    refreshReport().catch((cause) => setError(cause instanceof Error ? cause.message : "Laporan gagal dimuat"))
+  }, [refreshReport])
+  const dailyExpenses = dailyExpensesTotal
   const dailyProfit = dailyRevenue - dailyExpenses
   const monthlyProfit = monthlyRevenue - monthlyExpenses
 
   const addExpense = async () => {
     if (!newExpense.description || !newExpense.amount) return
-    const draft: Expense = {
-      id: `E${Date.now()}`, category: newExpense.category as Expense["category"],
-      description: newExpense.description, amount: Number(newExpense.amount), date: new Date(),
-    }
+
     try {
       setError("")
-      const created = await expensesApi.create(newExpense)
-      setExpenses([...expenses, { ...draft, id: String(created.id), date: new Date(created.date) }])
+      await expensesApi.create(newExpense)
+      await refreshReport()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Pengeluaran gagal disimpan")
       return
@@ -83,7 +59,7 @@ export function FinancialReport() {
     try {
       setError("")
       await expensesApi.delete(Number(id))
-      setExpenses(expenses.filter((e) => e.id !== id))
+      await refreshReport()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Pengeluaran gagal dihapus")
     }
@@ -96,8 +72,8 @@ export function FinancialReport() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f1e6] p-3 sm:p-4 lg:p-8">
+      <div className="mx-auto w-full max-w-5xl space-y-5 sm:space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Laporan Keuangan</h1>
           <p className="text-muted-foreground">Ringkasan laba/rugi hari ini</p>
@@ -173,7 +149,7 @@ export function FinancialReport() {
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                   value={newExpense.category}
-                  onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                  onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value as ExpenseCategory })}
                 >
                   <option value="bahan-baku">Bahan Baku</option>
                   <option value="gas">Gas</option>
@@ -205,12 +181,12 @@ export function FinancialReport() {
                 <p className="text-sm text-muted-foreground text-center py-4">Belum ada pengeluaran hari ini.</p>
               )}
               {expenses.map((expense) => (
-                <div key={expense.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={expense.id} className="flex flex-col gap-3 rounded-lg bg-[#f7f1e6] p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="font-medium">{expense.description}</p>
                     <Badge variant="secondary" className="text-xs mt-1">{expense.category}</Badge>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <p className="font-bold text-red-600">- Rp {expense.amount.toLocaleString("id-ID")}</p>
                     <Button size="icon" variant="ghost" onClick={() => deleteExpense(expense.id)} className="h-7 w-7 text-red-400 hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
@@ -230,9 +206,9 @@ export function FinancialReport() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-primary/10 rounded-lg p-4">
+            <div className="bg-[#315c3b]/10 rounded-lg p-4">
               <p className="text-sm text-muted-foreground">Saldo tersedia untuk ditarik</p>
-              <p className="text-3xl font-bold text-primary">Rp {dailyRevenue.toLocaleString("id-ID")}</p>
+              <p className="text-3xl font-bold text-[#315c3b]">Rp {dailyRevenue.toLocaleString("id-ID")}</p>
             </div>
             {settlementDone ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center text-green-700 font-medium">

@@ -11,7 +11,7 @@ const expenseRoutes = new Hono()
 const expenseSchema = z.object({
   category: z.enum(["bahan-baku", "gas", "plastik", "lainnya"]),
   description: z.string().min(2),
-  amount: z.string().or(z.number()),
+  amount: z.coerce.number().positive(),
   date: z.string().optional(),
 })
 
@@ -79,7 +79,8 @@ expenseRoutes.get("/today", authMiddleware, async (c) => {
 // Get single expense (protected)
 expenseRoutes.get("/:id", authMiddleware, async (c) => {
   try {
-    const id = parseInt(c.req.param("id")!)
+    const id = Number(c.req.param("id"))
+    if (!Number.isInteger(id) || id <= 0) return c.json({ error: "Invalid ID" }, 400)
     const expense = await db.query.expenses.findFirst({
       where: eq(expenses.id, id),
     })

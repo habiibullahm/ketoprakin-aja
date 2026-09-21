@@ -5,24 +5,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Clock, Trash2 } from "lucide-react"
-import { mockDebts } from "@/data/mock"
 import type { Debt } from "@/types"
 import { debtsApi } from "@/lib/api"
 import { useAuthGuard } from "@/lib/useAuthGuard"
 
 export function DebtBook() {
   useAuthGuard()
-  const [debts, setDebts] = useState<Debt[]>(mockDebts)
+  const [debts, setDebts] = useState<Debt[]>([])
   const [newDebt, setNewDebt] = useState({ customerName: "", amount: "", note: "" })
   const [error, setError] = useState("")
 
   useEffect(() => {
     debtsApi.getAll()
-      .then((data) => setDebts(data.map((debt: any) => ({
+      .then((data) => setDebts(data.map((debt) => ({
         id: String(debt.id), customerName: debt.customerName, amount: Number(debt.amount),
         date: new Date(debt.createdAt), paid: debt.paid, note: debt.note ?? undefined,
       }))))
-      .catch(() => undefined)
+      .catch((cause) => setError(cause instanceof Error ? cause.message : "Kasbon gagal dimuat"))
   }, [])
 
   const addDebt = async () => {
@@ -65,8 +64,8 @@ export function DebtBook() {
   const unpaidTotal = debts.filter((d) => !d.paid).reduce((sum, d) => sum + d.amount, 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f1e6] p-3 sm:p-4 lg:p-8">
+      <div className="mx-auto w-full max-w-5xl space-y-5 sm:space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Buku Kasbon</h1>
           <p className="text-muted-foreground">Catat utang pelanggan</p>
@@ -109,9 +108,9 @@ export function DebtBook() {
           <CardContent>
             <div className="space-y-3">
               {debts.map((debt) => (
-                <div key={debt.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div key={debt.id} className="flex flex-col gap-3 rounded-lg bg-[#f7f1e6] p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
                       <p className="font-semibold">{debt.customerName}</p>
                       <Badge variant={debt.paid ? "default" : "secondary"}>
                         {debt.paid ? <CheckCircle className="h-3 w-3 mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
@@ -123,7 +122,7 @@ export function DebtBook() {
                     </p>
                     {debt.note && <p className="text-sm text-muted-foreground mt-1">📝 {debt.note}</p>}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className={`text-lg font-bold ${debt.paid ? "text-green-600" : "text-orange-600"}`}>
                       Rp {debt.amount.toLocaleString("id-ID")}
                     </p>

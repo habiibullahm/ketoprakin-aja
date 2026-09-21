@@ -2,20 +2,19 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { menuItems } from "@/data/mock"
 import type { MenuItem } from "@/types"
 import { menuApi } from "@/lib/api"
 import { useAuthGuard } from "@/lib/useAuthGuard"
 
 export function StockManagement() {
   useAuthGuard()
-  const [items, setItems] = useState<MenuItem[]>(menuItems)
+  const [items, setItems] = useState<MenuItem[]>([])
   const [error, setError] = useState("")
 
   useEffect(() => {
     menuApi.getAll()
-      .then((data) => setItems(data.map((item: any) => ({ ...item, id: String(item.id), price: Number(item.price) }))))
-      .catch(() => undefined)
+      .then((data) => setItems(data.map((item) => ({ ...item, id: String(item.id), price: Number(item.price), description: item.description ?? "" }))))
+      .catch((cause) => setError(cause instanceof Error ? cause.message : "Stok gagal dimuat"))
   }, [])
 
   const toggleAvailability = async (id: string) => {
@@ -31,8 +30,8 @@ export function StockManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f1e6] p-3 sm:p-4 lg:p-8">
+      <div className="mx-auto w-full max-w-5xl space-y-5 sm:space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Manajemen Stok</h1>
           <p className="text-muted-foreground">Toggle ketersediaan bahan/menu</p>
@@ -52,7 +51,7 @@ export function StockManagement() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{item.description}</p>
-                    <p className="text-sm font-medium text-primary mt-2">
+                    <p className="text-sm font-medium text-[#315c3b] mt-2">
                       Rp {item.price.toLocaleString("id-ID")}
                     </p>
                   </div>

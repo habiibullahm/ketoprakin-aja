@@ -1,3 +1,5 @@
+import type { ApiDebt, ApiExpense, ApiMenuItem, ApiOrder, AuthUser, CreateDebtInput, CreateExpenseInput, CreateOrderInput, MerchantDashboard, MenuItemInput, UpdateExpenseInput } from "@/types/api"
+
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? (
   import.meta.env.DEV ? 'http://localhost:3000/api' : '/api'
 );
@@ -48,7 +50,7 @@ const apiRequest = async <T>(
 // Auth API
 export const authApi = {
   login: async (email: string, password: string) => {
-    const response = await apiRequest<{ user: any; token: string }>('/auth/login', {
+    const response = await apiRequest<{ user: AuthUser; token: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -72,78 +74,78 @@ export const authApi = {
 };
 
 export const customerApi = {
-  orders: () => apiRequest<any[]>("/customer/orders"),
+  orders: () => apiRequest<ApiOrder[]>("/customer/orders"),
   loyalty: () => apiRequest<{ stamps: number; remaining: number; rewardAvailable: boolean }>("/customer/loyalty"),
 };
 
 // Menu API
 export const menuApi = {
-  getAll: () => apiRequest<any[]>('/menu'),
+  getAll: () => apiRequest<ApiMenuItem[]>('/menu'),
 
-  getAvailable: () => apiRequest<any[]>('/menu/available'),
+  getAvailable: () => apiRequest<ApiMenuItem[]>('/menu/available'),
 
-  getById: (id: number) => apiRequest<any>(`/menu/${id}`),
+  getById: (id: number) => apiRequest<ApiMenuItem>(`/menu/${id}`),
 
-  create: (data: any) =>
-    apiRequest<any>('/menu', {
+  create: (data: MenuItemInput) =>
+    apiRequest<ApiMenuItem>('/menu', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: number, data: any) =>
-    apiRequest<any>(`/menu/${id}`, {
+  update: (id: number, data: Partial<MenuItemInput>) =>
+    apiRequest<ApiMenuItem>(`/menu/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   toggleAvailability: (id: number) =>
-    apiRequest<any>(`/menu/${id}/toggle`, {
+    apiRequest<ApiMenuItem>(`/menu/${id}/toggle`, {
       method: 'PATCH',
     }),
 
   delete: (id: number) =>
-    apiRequest<any>(`/menu/${id}`, {
+    apiRequest<ApiMenuItem>(`/menu/${id}`, {
       method: 'DELETE',
     }),
 };
 
 // Orders API
 export const ordersApi = {
-  getAll: () => apiRequest<any[]>('/orders'),
+  getAll: () => apiRequest<ApiOrder[]>('/orders'),
 
-  getActive: () => apiRequest<any[]>('/orders/active'),
+  getActive: () => apiRequest<ApiOrder[]>('/orders/active'),
 
-  getById: (id: number) => apiRequest<any>(`/orders/${id}`),
+  getById: (id: number) => apiRequest<ApiOrder>(`/orders/${id}`),
 
   getByTrackingToken: (trackingToken: string) =>
-    apiRequest<any>(`/orders/track/${encodeURIComponent(trackingToken)}`),
+    apiRequest<ApiOrder>(`/orders/track/${encodeURIComponent(trackingToken)}`),
 
-  createGuest: (data: any) =>
-    apiRequest<any>('/orders/guest', {
+  createGuest: (data: CreateOrderInput & { whatsappNumber: string }) =>
+    apiRequest<ApiOrder>('/orders/guest', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  create: (data: any) =>
-    apiRequest<any>('/orders', {
+  create: (data: CreateOrderInput) =>
+    apiRequest<ApiOrder>('/orders', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   updateStatus: (id: number, status: string) =>
-    apiRequest<any>(`/orders/${id}/status`, {
+    apiRequest<ApiOrder>(`/orders/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
 
   updatePaymentStatus: (id: number, paymentStatus: string) =>
-    apiRequest<any>(`/orders/${id}/payment`, {
+    apiRequest<ApiOrder>(`/orders/${id}/payment`, {
       method: 'PATCH',
       body: JSON.stringify({ paymentStatus }),
     }),
 
   performAction: (id: number, action: string) =>
-    apiRequest<any>(`/orders/${id}/action`, {
+    apiRequest<ApiOrder>(`/orders/${id}/action`, {
       method: 'PATCH',
       body: JSON.stringify({ action }),
     }),
@@ -151,58 +153,62 @@ export const ordersApi = {
 
 // Expenses API
 export const expensesApi = {
-  getAll: () => apiRequest<any[]>('/expenses'),
+  getAll: () => apiRequest<ApiExpense[]>('/expenses'),
 
-  getToday: () => apiRequest<any[]>('/expenses/today'),
+  getToday: () => apiRequest<ApiExpense[]>('/expenses/today'),
 
-  getById: (id: number) => apiRequest<any>(`/expenses/${id}`),
+  getById: (id: number) => apiRequest<ApiExpense>(`/expenses/${id}`),
 
-  create: (data: any) =>
-    apiRequest<any>('/expenses', {
+  create: (data: CreateExpenseInput) =>
+    apiRequest<ApiExpense>('/expenses', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (id: number, data: any) =>
-    apiRequest<any>(`/expenses/${id}`, {
+  update: (id: number, data: UpdateExpenseInput) =>
+    apiRequest<ApiExpense>(`/expenses/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   delete: (id: number) =>
-    apiRequest<any>(`/expenses/${id}`, {
+    apiRequest<{ message: string }>(`/expenses/${id}`, {
       method: 'DELETE',
     }),
 };
 
 // Debts API
 export const debtsApi = {
-  getAll: () => apiRequest<any[]>('/debts'),
+  getAll: () => apiRequest<ApiDebt[]>('/debts'),
 
-  getUnpaid: () => apiRequest<any[]>('/debts/unpaid'),
+  getUnpaid: () => apiRequest<ApiDebt[]>('/debts/unpaid'),
 
-  getPaid: () => apiRequest<any[]>('/debts/paid'),
+  getPaid: () => apiRequest<ApiDebt[]>('/debts/paid'),
 
-  getById: (id: number) => apiRequest<any>(`/debts/${id}`),
+  getById: (id: number) => apiRequest<ApiDebt>(`/debts/${id}`),
 
-  create: (data: any) =>
-    apiRequest<any>('/debts', {
+  create: (data: CreateDebtInput) =>
+    apiRequest<ApiDebt>('/debts', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   markAsPaid: (id: number) =>
-    apiRequest<any>(`/debts/${id}/pay`, {
+    apiRequest<ApiDebt>(`/debts/${id}/pay`, {
       method: 'PATCH',
     }),
 
   markAsUnpaid: (id: number) =>
-    apiRequest<any>(`/debts/${id}/unpay`, {
+    apiRequest<ApiDebt>(`/debts/${id}/unpay`, {
       method: 'PATCH',
     }),
 
   delete: (id: number) =>
-    apiRequest<any>(`/debts/${id}`, {
+    apiRequest<{ message: string }>(`/debts/${id}`, {
       method: 'DELETE',
     }),
 };
+
+export const merchantApi = {
+  getDashboard: (date?: string) => apiRequest<MerchantDashboard>(`/merchant/dashboard${date ? `?date=${encodeURIComponent(date)}` : ""}`),
+}

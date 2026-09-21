@@ -1,84 +1,144 @@
-# Ketoprakin Aja - Aplikasi Warung Ketoprak Mas Edo
+# Ketoprakin Aja - Warung Ketoprak Mas Edo
 
-Platform pemesanan digital untuk Warung Ketoprak Mas Edo, dengan frontend React dan backend API Hono.
+Aplikasi pemesanan digital dengan frontend React/Vite dan backend Hono/Drizzle. UI customer dan merchant mengikuti Paper design, sedangkan QRIS masih mock/non-scannable.
 
-## 🚀 Quick Start
+## Quick Start
 
-```bash
+### 1. Install dependency
+
+```powershell
 cd frontend
 npm install
+cd ..\backend
+npm install
+```
+
+### 2. Configure backend
+
+Buat `backend/.env` dari `backend/.env.example`, lalu isi connection string PostgreSQL/Neon:
+
+```env
+DATABASE_URL=postgresql://...
+JWT_SECRET=change-this-in-development
+PORT=3000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+NOTIFICATION_PROVIDER=none
+```
+
+Jangan commit `backend/.env` atau connection string.
+
+### 3. Initialize database
+
+```powershell
+cd backend
+npm run db:init
+```
+
+Perintah ini membuat schema dan seed akun merchant/menu default.
+
+Default merchant:
+
+```text
+Email: masedo@ketoprakin.com
+Password: password123
+URL: http://localhost:5173/merchant/login
+```
+
+### 4. Run backend dan frontend
+
+Terminal backend:
+
+```powershell
+cd backend
 npm run dev
 ```
 
-Buka browser di `http://localhost:5173`. Untuk menjalankan API secara lokal, buka terminal lain lalu jalankan `cd backend`, `npm install`, dan `npm run dev`.
+Terminal frontend:
 
-## 📱 Features
-
-### Customer (Pelanggan)
-- **Menu & Kustomisasi:** Pilih menu ketoprak, atur level pedas (0-20), bawang putih, kekentalan bumbu
-- **Guest Checkout:** Pesan tanpa akun dengan nama dan nomor WhatsApp Indonesia
-- **Order Tracking:** Pantau status pesanan real-time (Menunggu → Nguleg → Siap Diambil)
-- **Pembayaran Digital:** UI untuk QRIS, GoPay, OVO, Dana
-
-### Merchant (Mas Edo)
-- **Kitchen Display System (KDS):** Layar pesanan masuk dengan instruksi khusus
-- **Laporan Keuangan:** Omzet, pengeluaran, laba bersih harian
-- **Manajemen Stok:** Toggle ketersediaan menu
-- **Buku Kasbon:** Catat utang pelanggan
-
-## 🛠️ Tech Stack
-
-- **React 19** + **TypeScript**
-- **Vite 8** (build tool)
-- **Tailwind CSS v4** (styling)
-- **shadcn/ui** (component library)
-- **React Router DOM** (routing)
-- **Lucide React** (icons)
-
-## 📂 Project Structure
-
-```
-frontend/                # React + Vite application
-├── src/
-│   ├── components/ui/  # shadcn components
-│   ├── pages/          # Customer and merchant pages
-│   ├── data/           # Mock data
-│   ├── types/          # TypeScript types
-│   └── lib/            # Utilities and API client
-├── public/             # Static assets
-└── package.json
-backend/                 # Hono API and database code
-├── src/
-│   ├── routes/         # API endpoints
-│   └── db/             # Drizzle schema and connection
-└── package.json
+```powershell
+cd frontend
+npm run dev
 ```
 
-## 📖 Documentation
+Buka `http://localhost:5173`.
+Backend health check: `http://localhost:3000/health`.
 
-- [PRD](docs/PRD.md) - Product Requirements Document
-- [Tech Stack](docs/TECH_STACK.md) - Architecture & implementation details
+## Frontend Environment
 
-## 🎨 Design
+Untuk dev, frontend memakai backend lokal secara eksplisit melalui `frontend/.env`:
 
-- **Primary Color:** Green (tema ketoprak)
-- **Responsive:** Mobile-first design
-- **Theme:** Light/Dark mode support
+```env
+VITE_API_URL=http://localhost:3000/api
+VITE_SOCKET_URL=http://localhost:3000
+```
 
-## 🚧 Status
+Jika file ini tidak ada, client memakai fallback URL yang sama saat `import.meta.env.DEV` aktif. Restart Vite setelah mengubah env.
 
-Backend API, PostgreSQL, authentication, and Socket.IO support are included. Payment gateway integration remains to be completed for production.
+## Features
 
-### Production frontend configuration
+### Customer
 
-Production URL: `https://ketoprakin-aja.vercel.app`
+- Paper mobile-first menu dengan hero, menu card, customization, cart, dan checkout.
+- Customization cabai `0-20`, bawang, kekentalan bumbu, topping, pickup/dine-in.
+- Order tracking dengan polling/socket existing.
+- QRIS mock dengan label yang jelas; belum ada payment provider nyata.
 
-The temporary Vercel deployment uses same-origin external rewrites for `/api/*` and `/socket.io/*` to the VPS, so `VITE_API_URL` and `VITE_SOCKET_URL` remain unset. This avoids browser mixed-content and CORS errors, but the Vercel-to-VPS hop remains HTTP until a backend domain with TLS is configured. The Docker deployment also uses same-origin Nginx proxying.
+Routes utama:
 
-When the backend has an HTTPS domain, remove the external rewrites and configure `VITE_API_URL` with the HTTPS API base ending in `/api` and `VITE_SOCKET_URL` with the HTTPS backend origin.
+- `/`
+- `/customer/login`
+- `/customer/tracking`
+- `/track/:trackingToken`
 
-Pushes to `master` are automatically linted, built, and deployed to the Vercel production project `ketoprakin-aja` by `.github/workflows/deploy-vercel.yml`. Configure the repository Actions secret `VERCEL_TOKEN` with a Vercel access token that can deploy this project.
+### Merchant
 
-## 📄 License
+- Paper sidebar dan merchant shell.
+- KDS: konfirmasi payment dan transisi order.
+- Dashboard KPI dari `GET /api/merchant/dashboard`.
+- Stok memakai toggle availability; schema belum menyimpan quantity inventory.
+- Keuangan memakai dashboard dan CRUD expenses.
+- Kasbon memakai CRUD debts.
+
+Routes utama:
+
+- `/merchant/login`
+- `/merchant/kitchen`
+- `/merchant/stock`
+- `/merchant/financial`
+- `/merchant/debt`
+
+## Tech Stack
+
+- React 19, TypeScript, Vite 8
+- Tailwind CSS v4, shadcn/ui, Lucide React
+- Hono, Drizzle ORM, PostgreSQL/Neon
+- Socket.IO, JWT, Zod
+
+## Validation
+
+```powershell
+cd frontend
+npm run build
+
+cd ..\backend
+npm run build
+npm test
+git diff --check
+```
+
+## Production Notes
+
+- Use a pooled Neon URL for normal API traffic where appropriate.
+- Use a direct Neon URL for schema migration/admin operations when required by the migration tool.
+- Set production `VITE_API_URL` and `VITE_SOCKET_URL` only when the backend is served from a public HTTPS origin. Same-origin proxying can leave them unset.
+- Settlement remains simulation-only and does not create a permanent ledger entry.
+
+## Documentation
+
+- [PRD](docs/PRD.md)
+- [Tech Stack](docs/TECH_STACK.md)
+
+## License
 
 MIT

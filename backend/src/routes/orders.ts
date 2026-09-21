@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { db } from "../db"
 import { orders, orderItems, menuItems, loyaltyStamps, users } from "../db/schema"
-import { eq, desc, ne } from "drizzle-orm"
+import { and, eq, desc, ne } from "drizzle-orm"
 import { z } from "zod"
 import { authMiddleware, merchantMiddleware } from "../middleware/auth"
 import { getIo } from "../lib/socket"
@@ -26,7 +26,7 @@ const createOrderSchema = z.object({
   customerName: z.string().min(2),
   customerPhone: z.string().optional(),
   orderType: z.enum(["dine-in", "pickup"]),
-  paymentMethod: z.enum(["qris", "gopay", "ovo", "dana", "cash"]),
+  paymentMethod: z.literal("qris"),
   items: z.array(orderItemSchema).min(1),
   notes: z.string().optional(),
 })
@@ -38,11 +38,9 @@ const guestOrderSchema = createOrderSchema.omit({ customerPhone: true }).extend(
 const orderActionSchema = z.object({
   action: z.enum([
     "start_preparing",
-    "mark_paid",
+    "confirm_payment",
     "mark_ready",
-    "mark_ready_and_paid",
     "mark_collected",
-    "mark_collected_and_paid",
   ]),
 })
 
@@ -385,23 +383,22 @@ orderRoutes.patch("/:id/action", merchantMiddleware, async (c) => {
 
       const alreadyApplied =
         (action === "start_preparing" && current.status === "nguleg") ||
-        (action === "mark_paid" && current.paymentStatus === "paid") ||
+        (action === "confirm_payment" && current.paymentStatus === "paid") ||
         (action === "mark_ready" && current.status === "siap-diambil") ||
-        (action === "mark_ready_and_paid" && current.status === "siap-diambil" && current.paymentStatus === "paid") ||
-        (action === "mark_collected" && current.status === "selesai") ||
-        (action === "mark_collected_and_paid" && current.status === "selesai" && current.paymentStatus === "paid")
+        (action === "mark_collected" && current.status === "selesai")
       if (alreadyApplied) return { order: current, changed: false }
 
       const transitions: Record<string, { from: string[]; status?: string; paid?: boolean }> = {
         start_preparing: { from: ["menunggu"], status: "nguleg" },
-        mark_paid: { from: ["menunggu", "nguleg", "siap-diambil"], paid: true },
+        confirm_payment: { from: ["menunggu", "nguleg", "siap-diambil"], paid: true },
         mark_ready: { from: ["nguleg"], status: "siap-diambil" },
-        mark_ready_and_paid: { from: ["nguleg"], status: "siap-diambil", paid: true },
         mark_collected: { from: ["siap-diambil"], status: "selesai" },
-        mark_collected_and_paid: { from: ["siap-diambil"], status: "selesai", paid: true },
       }
       const transition = transitions[action]
       if (!transition.from.includes(current.status)) throw new Error("INVALID_TRANSITION")
+      if ((action === "mark_ready" || action === "mark_collected") && current.paymentStatus !== "paid") {
+        throw new Error("PAYMENT_REQUIRED")
+      }
 
       const [order] = await tx.update(orders).set({
         status: transition.status ?? current.status,
@@ -428,7 +425,7 @@ orderRoutes.patch("/:id/action", merchantMiddleware, async (c) => {
       io.to("kitchen").emit("order-status-update", statusUpdate)
       io.to(`track:${updated.trackingToken}`).emit("order-status-update", statusUpdate)
     }
-    if (result.changed && (action === "mark_ready" || action === "mark_ready_and_paid")) {
+    if (result.changed && action === "mark_ready") {
       void getOrderNotifier().sendOrderReady(updated).catch((error) => console.error("Ready notification failed", error))
     }
     return c.json(updated)
@@ -436,6 +433,9 @@ orderRoutes.patch("/:id/action", merchantMiddleware, async (c) => {
     if (error instanceof z.ZodError) return c.json({ error: error.issues }, 400)
     if (error instanceof Error && error.message === "INVALID_TRANSITION") {
       return c.json({ error: "Perubahan status tidak valid" }, 409)
+    }
+    if (error instanceof Error && error.message === "PAYMENT_REQUIRED") {
+      return c.json({ error: "Konfirmasi pembayaran sebelum pesanan siap diambil" }, 409)
     }
     return c.json({ error: "Failed to update order" }, 500)
   }
@@ -448,12 +448,27 @@ orderRoutes.patch("/:id/status", merchantMiddleware, async (c) => {
     if (!idParam) {
       return c.json({ error: "Invalid ID" }, 400)
     }
-    const id = parseInt(idParam)
-    const { status } = await c.req.json()
+    const id = Number(idParam)
+    if (!Number.isInteger(id) || id <= 0) return c.json({ error: "Invalid ID" }, 400)
+    const { status } = z.object({
+      status: z.enum(["menunggu", "nguleg", "siap-diambil", "selesai"]),
+    }).parse(await c.req.json())
 
-    const validStatuses = ["menunggu", "nguleg", "siap-diambil", "selesai"]
-    if (!validStatuses.includes(status)) {
-      return c.json({ error: "Invalid status" }, 400)
+    const current = await db.query.orders.findFirst({ where: eq(orders.id, id) })
+    if (!current) return c.json({ error: "Order not found" }, 404)
+    if (status === current.status) return c.json(current)
+
+    const allowedNextStatuses: Record<string, string[]> = {
+      menunggu: ["nguleg"],
+      nguleg: ["siap-diambil"],
+      "siap-diambil": ["selesai"],
+      selesai: [],
+    }
+    if (!allowedNextStatuses[current.status]?.includes(status)) {
+      return c.json({ error: "Perubahan status tidak valid" }, 409)
+    }
+    if ((status === "siap-diambil" || status === "selesai") && current.paymentStatus !== "paid") {
+      return c.json({ error: "Konfirmasi pembayaran sebelum pesanan siap diambil" }, 409)
     }
 
     const [updated] = await db
@@ -481,6 +496,7 @@ orderRoutes.patch("/:id/status", merchantMiddleware, async (c) => {
 
     return c.json(updated)
   } catch (error) {
+    if (error instanceof z.ZodError) return c.json({ error: error.issues }, 400)
     return c.json({ error: "Failed to update order status" }, 500)
   }
 })
@@ -492,26 +508,17 @@ orderRoutes.patch("/:id/payment", merchantMiddleware, async (c) => {
     if (!idParam) {
       return c.json({ error: "Invalid ID" }, 400)
     }
-    const id = parseInt(idParam)
+    const id = Number(idParam)
+    if (!Number.isInteger(id) || id <= 0) return c.json({ error: "Invalid ID" }, 400)
     const { paymentStatus } = await c.req.json()
+    if (paymentStatus !== "paid") return c.json({ error: "Only pending to paid is allowed" }, 400)
 
-    const validStatuses = ["pending", "paid", "failed"]
-    if (!validStatuses.includes(paymentStatus)) {
-      return c.json({ error: "Invalid payment status" }, 400)
-    }
-
-    const [updated] = await db
-      .update(orders)
-      .set({
-        paymentStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(orders.id, id))
+    const [updated] = await db.update(orders)
+      .set({ paymentStatus: "paid", updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.paymentStatus, "pending")))
       .returning()
 
-    if (!updated) {
-      return c.json({ error: "Order not found" }, 404)
-    }
+    if (!updated) return c.json({ error: "Order not found" }, 404)
 
     if (updated.paymentStatus === "paid" && updated.userId) {
       await db.insert(loyaltyStamps).values({ userId: updated.userId, orderId: updated.id }).onConflictDoNothing()

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" role="img" aria-labelledby="title desc">
+  <title id="title">Mock QRIS payment code</title>
+  <desc id="desc">Placeholder QRIS code. Replace before production.</desc>
+  <rect width="240" height="280" rx="16" fill="#fff"/>
+  <rect x="20" y="20" width="200" height="200" rx="8" fill="#111"/>
+  <path fill="#fff" d="M32 32h52v52H32zm12 12v28h28V44zm100-12h52v52h-52zm12 12v28h28V44zM32 148h52v52H32zm12 12v28h28v-28zM100 32h16v16h-16zm0 32h32v16h-32zm-16 48h16v16H84zm32 0h16v32h-16zm32-16h16v16h-16zm-16 32h48v16h-48zm-32 36h16v16h-16zm32 16h16v16h-16zm32-32h16v32h-16z"/>
+  <text x="120" y="244" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700">MOCK QRIS</text>
+  <text x="120" y="264" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" fill="#666">Ganti sebelum produksi</text>
+</svg>
