@@ -26,7 +26,7 @@ CORS_ORIGIN=http://localhost:5173
 NOTIFICATION_PROVIDER=none
 ```
 
-Jangan commit `backend/.env` atau connection string.
+Jangan commit `backend/.env` atau connection string. Untuk lokal, gunakan PostgreSQL yang dapat diakses dari `DATABASE_URL`; untuk production, gunakan pooled Neon connection string.
 
 ### 3. Initialize database
 
@@ -64,7 +64,20 @@ npm run dev
 Buka `http://localhost:5173`.
 Backend health check: `http://localhost:3000/health`.
 
-## Frontend Environment
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Required | Description |
+|---|---:|---|
+| `DATABASE_URL` | Yes | PostgreSQL/Neon connection string. Gunakan pooled Neon URL untuk API production. |
+| `JWT_SECRET` | Yes | Secret signing JWT; generate dengan `openssl rand -hex 32`. |
+| `PORT` | No | Port API, default `3000`. |
+| `NODE_ENV` | No | `development` atau `production`. |
+| `CORS_ORIGIN` | Yes | Origin frontend yang diizinkan, misalnya `http://localhost:5173`. |
+| `NOTIFICATION_PROVIDER` | No | Default `none`; notifikasi eksternal belum diperlukan. |
+
+### Frontend (`frontend/.env`)
 
 Untuk dev, frontend memakai backend lokal secara eksplisit melalui `frontend/.env`:
 
@@ -73,7 +86,7 @@ VITE_API_URL=http://localhost:3000/api
 VITE_SOCKET_URL=http://localhost:3000
 ```
 
-Jika file ini tidak ada, client memakai fallback URL yang sama saat `import.meta.env.DEV` aktif. Restart Vite setelah mengubah env.
+Jika file ini tidak ada, client memakai fallback URL yang sama saat `import.meta.env.DEV` aktif. Restart Vite setelah mengubah env. Untuk production dengan frontend dan API pada host yang sama, kedua variable frontend dapat dikosongkan karena client memakai `/api` dan `/socket.io` melalui proxy. Jika API berada di origin berbeda, isi dengan URL publik HTTPS API.
 
 ## Features
 
@@ -129,9 +142,33 @@ git diff --check
 
 ## Production Notes
 
-- Use a pooled Neon URL for normal API traffic where appropriate.
-- Use a direct Neon URL for schema migration/admin operations when required by the migration tool.
-- Set production `VITE_API_URL` and `VITE_SOCKET_URL` only when the backend is served from a public HTTPS origin. Same-origin proxying can leave them unset.
+- Production saat ini berjalan di VPS melalui Docker Compose:
+  - Frontend: `http://43.157.227.176/`
+  - Backend internal: `127.0.0.1:3000`
+  - Health check: `http://43.157.227.176/health`
+- Database production menggunakan Neon Serverless, bukan container PostgreSQL lokal.
+- Root cause koneksi Neon dari container sebelumnya adalah resolver Node mencoba IPv6 sementara VPS hanya dapat keluar melalui IPv4. Backend sekarang memaksa IPv4 untuk koneksi Neon pooler, menonaktifkan prepared statements, dan memakai pool kecil dengan timeout.
+- Jangan memakai `https://43.157.227.176/` sebelum SSL/domain dikonfigurasi.
+- Deploy/update VPS:
+
+```bash
+git pull origin main
+docker compose -f docker-compose.vps.yml build
+docker compose -f docker-compose.vps.yml up -d
+docker compose -f docker-compose.vps.yml ps
+docker compose -f docker-compose.vps.yml logs -f backend
+```
+
+- `db-init` menjalankan schema/seed terhadap `DATABASE_URL` yang ada di `.env` VPS. Pastikan URL tersebut menunjuk ke Neon sebelum menjalankan compose.
+- Vercel frontend memakai root `vercel.json`, dengan build dari `frontend/`:
+
+```text
+Install: npm --prefix frontend ci
+Build:   npm --prefix frontend run build
+Output:  frontend/dist
+```
+
+- Deployment Vercel aktif: https://ketoprakin-k7qt9t3kh-habiibullahms-projects.vercel.app/
 - Settlement remains simulation-only and does not create a permanent ledger entry.
 
 ## Documentation
@@ -142,3 +179,5 @@ git diff --check
 ## License
 
 MIT
+
+
