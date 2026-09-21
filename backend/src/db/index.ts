@@ -12,7 +12,14 @@ if (!connectionString) {
 }
 
 const usesNeonPooler = connectionString.includes('.neon.tech') && connectionString.includes('-pooler')
-if (usesNeonPooler) dns.setDefaultResultOrder('ipv4first')
+if (usesNeonPooler) {
+  dns.setDefaultResultOrder('ipv4first')
+  const lookup = dns.lookup as any
+  dns.lookup = ((hostname: string, options: any, callback: any) => {
+    if (typeof options === 'function') return lookup(hostname, { family: 4 }, options)
+    return lookup(hostname, { ...options, family: 4 }, callback)
+  }) as typeof dns.lookup
+}
 const postgresOptions = {
   connect_timeout: 30,
   max: usesNeonPooler ? 5 : 10,
