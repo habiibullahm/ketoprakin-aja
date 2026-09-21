@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
+import dns from "node:dns"
 import * as schema from "./schema"
 import dotenv from "dotenv"
 
@@ -11,6 +12,7 @@ if (!connectionString) {
 }
 
 const usesNeonPooler = connectionString.includes('.neon.tech') && connectionString.includes('-pooler')
+if (usesNeonPooler) dns.setDefaultResultOrder('ipv4first')
 const postgresOptions = {
   connect_timeout: 30,
   max: usesNeonPooler ? 5 : 10,
