@@ -9,6 +9,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop",
     category: "ketoprak",
     available: true,
+    stockQuantity: 30,
+    lowStockThreshold: 5,
   },
   {
     id: "k2",
@@ -18,6 +20,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop",
     category: "ketoprak",
     available: true,
+    stockQuantity: 30,
+    lowStockThreshold: 5,
   },
   {
     id: "k3",
@@ -27,6 +31,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop",
     category: "ketoprak",
     available: true,
+    stockQuantity: 30,
+    lowStockThreshold: 5,
   },
   {
     id: "t1",
@@ -36,6 +42,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
     category: "topping",
     available: true,
+    stockQuantity: 50,
+    lowStockThreshold: 5,
   },
   {
     id: "t2",
@@ -45,6 +53,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop",
     category: "topping",
     available: true,
+    stockQuantity: 50,
+    lowStockThreshold: 5,
   },
   {
     id: "m1",
@@ -54,6 +64,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop",
     category: "minuman",
     available: true,
+    stockQuantity: 20,
+    lowStockThreshold: 5,
   },
   {
     id: "m2",
@@ -63,6 +75,8 @@ export const menuItems: MenuItem[] = [
     image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop",
     category: "minuman",
     available: false,
+    stockQuantity: 0,
+    lowStockThreshold: 5,
   },
 ]
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ChevronRight, Minus, Plus, Search, ShoppingBag, UserRound, X } from "lucide-react"
-import { menuApi, ordersApi } from "@/lib/api"
+import { ApiError, menuApi, ordersApi } from "@/lib/api"
 import { normalizeIndonesianPhone } from "@/lib/phone"
 import { menuItems as mockMenuItems } from "@/data/mock"
 
@@ -142,6 +142,11 @@ export function CustomerMenu() {
       setCart([])
       navigate(`/track/${order.trackingToken}`)
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409 && typeof error.payload === "object" && error.payload !== null && "unavailableItems" in error.payload) {
+        const unavailableItems = (error.payload as { unavailableItems?: Array<{ name: string; requested: number; available: number }> }).unavailableItems ?? []
+        setCheckoutError(`${error.message}: ${unavailableItems.map((item) => `${item.name} (${item.available}/${item.requested})`).join(", ")}`)
+        return
+      }
       setCheckoutError(error instanceof Error ? error.message : "Gagal membuat pesanan.")
     } finally {
       setCheckoutLoading(false)

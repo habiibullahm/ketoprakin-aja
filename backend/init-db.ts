@@ -36,10 +36,35 @@ async function initDatabase() {
         category VARCHAR(50) NOT NULL,
         image TEXT,
         available BOOLEAN NOT NULL DEFAULT true,
+        stock_quantity INTEGER NOT NULL DEFAULT 0,
+        low_stock_threshold INTEGER NOT NULL DEFAULT 5,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
+    await db.execute(sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'menu_items'
+            AND column_name = 'stock_quantity'
+        ) THEN
+          ALTER TABLE menu_items ADD COLUMN stock_quantity INTEGER NOT NULL DEFAULT 0;
+          UPDATE menu_items
+          SET stock_quantity = CASE category
+            WHEN 'ketoprak' THEN 30
+            WHEN 'minuman' THEN 20
+            WHEN 'topping' THEN 50
+            ELSE 0
+          END;
+        END IF;
+      END
+      $$;
+    `);
+    await db.execute(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 5`);
     
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS orders (
@@ -137,14 +162,14 @@ async function initDatabase() {
     const menuCount = await db.execute(sql`SELECT COUNT(*) as count FROM menu_items`);
     if (menuCount[0].count === '0') {
       await db.execute(sql`
-        INSERT INTO menu_items (name, description, price, category, image, available) VALUES
-        ('Ketoprak Original', 'Lontong, tahu, tauge, bihun, bumbu kacang ulek manual', 15000, 'ketoprak', 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop', true),
-        ('Ketoprak Telur', 'Ketoprak original + telur rebus', 18000, 'ketoprak', 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop', true),
-        ('Ketoprak Spesial', 'Ketoprak original + telur + sate tahu + kerupuk ekstra', 25000, 'ketoprak', 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop', true),
-        ('Extra Tahu', 'Tahu goreng tambahan', 3000, 'topping', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop', true),
-        ('Extra Kerupuk', 'Kerupuk kanji tambahan', 2000, 'topping', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop', true),
-        ('Es Teh Manis', 'Teh manis dingin segar', 5000, 'minuman', 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop', true),
-        ('Es Jeruk', 'Jeruk peras segar', 7000, 'minuman', 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop', true)
+        INSERT INTO menu_items (name, description, price, category, image, available, stock_quantity, low_stock_threshold) VALUES
+        ('Ketoprak Original', 'Lontong, tahu, tauge, bihun, bumbu kacang ulek manual', 15000, 'ketoprak', 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop', true, 30, 5),
+        ('Ketoprak Telur', 'Ketoprak original + telur rebus', 18000, 'ketoprak', 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop', true, 30, 5),
+        ('Ketoprak Spesial', 'Ketoprak original + telur + sate tahu + kerupuk ekstra', 25000, 'ketoprak', 'https://images.unsplash.com/photo-1562967916-eb82221dfb92?w=400&h=300&fit=crop', true, 30, 5),
+        ('Extra Tahu', 'Tahu goreng tambahan', 3000, 'topping', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop', true, 50, 5),
+        ('Extra Kerupuk', 'Kerupuk kanji tambahan', 2000, 'topping', 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop', true, 50, 5),
+        ('Es Teh Manis', 'Teh manis dingin segar', 5000, 'minuman', 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop', true, 20, 5),
+        ('Es Jeruk', 'Jeruk peras segar', 7000, 'minuman', 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop', true, 20, 5)
       `);
       console.log('✓ Menu items seeded');
     }

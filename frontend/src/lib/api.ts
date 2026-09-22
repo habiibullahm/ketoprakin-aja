@@ -4,6 +4,17 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? (
   import.meta.env.DEV ? 'http://localhost:3000/api' : '/api'
 );
 
+export class ApiError extends Error {
+  readonly status: number
+  readonly payload: unknown
+
+  constructor(message: string, status: number, payload: unknown) {
+    super(message)
+    this.status = status
+    this.payload = payload
+  }
+}
+
 // Helper function to get token from localStorage
 export const getToken = (): string | null => {
   return localStorage.getItem('authToken');
@@ -40,8 +51,8 @@ const apiRequest = async <T>(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.details || error.error || 'API request failed');
+    const error = await response.json().catch(() => ({}));
+    throw new ApiError(error.details || error.error || 'API request failed', response.status, error);
   }
 
   return response.json();
@@ -101,6 +112,12 @@ export const menuApi = {
   toggleAvailability: (id: number) =>
     apiRequest<ApiMenuItem>(`/menu/${id}/toggle`, {
       method: 'PATCH',
+    }),
+
+  updateStock: (id: number, data: { stockQuantity: number; lowStockThreshold: number }) =>
+    apiRequest<ApiMenuItem>(`/menu/${id}/stock`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
 
   delete: (id: number) =>

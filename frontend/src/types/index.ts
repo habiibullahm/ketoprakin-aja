@@ -6,6 +6,8 @@ export interface MenuItem {
   image: string
   category: "ketoprak" | "topping" | "minuman"
   available: boolean
+  stockQuantity: number
+  lowStockThreshold: number
 }
 
 export interface Customization {

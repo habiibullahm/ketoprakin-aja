@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { db } from "../db"
 import { menuItems } from "../db/schema"
-import { eq } from "drizzle-orm"
+import { and, eq, gt } from "drizzle-orm"
 import { z } from "zod"
 import { merchantMiddleware as authMiddleware } from "../middleware/auth"
 
@@ -15,6 +15,13 @@ const menuItemSchema = z.object({
   category: z.enum(["ketoprak", "topping", "minuman"]),
   image: z.string().optional(),
   available: z.boolean().optional(),
+  stockQuantity: z.number().int().nonnegative().optional(),
+  lowStockThreshold: z.number().int().nonnegative().optional(),
+})
+
+const stockSchema = z.object({
+  stockQuantity: z.number().int().nonnegative(),
+  lowStockThreshold: z.number().int().nonnegative(),
 })
 
 // Get all menu items
@@ -31,7 +38,7 @@ menuRoutes.get("/", async (c) => {
 menuRoutes.get("/available", async (c) => {
   try {
     const items = await db.query.menuItems.findMany({
-      where: eq(menuItems.available, true),
+      where: and(eq(menuItems.available, true), gt(menuItems.stockQuantity, 0)),
     })
     return c.json(items)
   } catch (error) {
@@ -135,6 +142,25 @@ menuRoutes.patch("/:id/toggle", authMiddleware, async (c) => {
     return c.json(updated)
   } catch (error) {
     return c.json({ error: "Failed to toggle availability" }, 500)
+  }
+})
+
+menuRoutes.patch("/:id/stock", authMiddleware, async (c) => {
+  try {
+    const id = Number(c.req.param("id"))
+    if (!Number.isInteger(id) || id <= 0) return c.json({ error: "Invalid ID" }, 400)
+    const validated = stockSchema.parse(await c.req.json())
+    const [updated] = await db
+      .update(menuItems)
+      .set({ ...validated, updatedAt: new Date() })
+      .where(eq(menuItems.id, id))
+      .returning()
+
+    if (!updated) return c.json({ error: "Menu item not found" }, 404)
+    return c.json(updated)
+  } catch (error) {
+    if (error instanceof z.ZodError) return c.json({ error: error.issues }, 400)
+    return c.json({ error: "Failed to update stock" }, 500)
   }
 })
 

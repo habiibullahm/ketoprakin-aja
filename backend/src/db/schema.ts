@@ -21,6 +21,8 @@ export const menuItems = pgTable("menu_items", {
   category: varchar("category", { length: 50 }).notNull(), // ketoprak, topping, minuman
   image: text("image"),
   available: boolean("available").default(true).notNull(),
+  stockQuantity: integer("stock_quantity").default(0).notNull(),
+  lowStockThreshold: integer("low_stock_threshold").default(5).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
