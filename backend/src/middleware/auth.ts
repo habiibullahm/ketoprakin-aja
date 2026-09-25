@@ -3,6 +3,7 @@ import { verify } from "jsonwebtoken"
 import { db } from "../db"
 import { users } from "../db/schema"
 import { eq } from "drizzle-orm"
+import { jwtSecret } from "../config"
 
 export const authMiddleware = async (c: Context, next: Next) => {
   const authHeader = c.req.header("Authorization")
@@ -14,7 +15,7 @@ export const authMiddleware = async (c: Context, next: Next) => {
   const token = authHeader.substring(7)
 
   try {
-    const decoded = verify(token, process.env.JWT_SECRET!) as { userId: number }
+    const decoded = verify(token, jwtSecret) as unknown as { userId: number }
     
     const user = await db.query.users.findFirst({
       where: eq(users.id, decoded.userId),
@@ -40,3 +41,4 @@ export const merchantMiddleware = async (c: Context, next: Next) => {
     return next()
   }) as Next)
 }
+

@@ -5,14 +5,15 @@ import { db } from "../db"
 import { users } from "../db/schema"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
+import { jwtSecret } from "../config"
 
 const authRoutes = new Hono()
 
 // Validation schemas
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
-  name: z.string().min(2),
+  password: z.string().min(12).max(128),
+  name: z.string().min(2).max(255),
 })
 
 const loginSchema = z.object({
@@ -52,7 +53,7 @@ authRoutes.post("/register", async (c) => {
     // Generate token
     const token = sign(
       { userId: newUser.id },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       { expiresIn: "7d" }
     )
 
@@ -97,7 +98,7 @@ authRoutes.post("/login", async (c) => {
     // Generate token
     const token = sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       { expiresIn: "7d" }
     )
 
@@ -127,7 +128,7 @@ authRoutes.get("/me", async (c) => {
 
   try {
     const token = authHeader.substring(7)
-    const decoded = verify(token, process.env.JWT_SECRET!) as { userId: number }
+    const decoded = verify(token, jwtSecret) as unknown as { userId: number }
     
     const user = await db.query.users.findFirst({
       where: eq(users.id, decoded.userId),
@@ -149,3 +150,4 @@ authRoutes.get("/me", async (c) => {
 })
 
 export { authRoutes }
+

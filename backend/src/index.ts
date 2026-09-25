@@ -9,6 +9,9 @@ import { customerRoutes } from "./routes/customer"
 import { merchantRoutes } from "./routes/merchant"
 import { setIo } from "./lib/socket"
 import { cors } from "hono/cors"
+import { sql } from "drizzle-orm"
+import { db } from "./db"
+import "./config"
 
 const app = new Hono()
 
@@ -28,6 +31,15 @@ app.route("/api/merchant", merchantRoutes)
 
 app.get("/health", (c) => c.json({ status: "ok" }))
 
+app.get("/ready", async (c) => {
+  try {
+    await db.execute(sql`SELECT 1`)
+    return c.json({ status: "ready" })
+  } catch {
+    return c.json({ status: "not_ready" }, 503)
+  }
+})
+
 const server = serve(
   {
     fetch: app.fetch,
@@ -39,3 +51,4 @@ const server = serve(
 )
 
 setIo(server)
+

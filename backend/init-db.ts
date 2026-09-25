@@ -149,7 +149,11 @@ async function initDatabase() {
     `);
     
     if (merchantExists[0].count === '0') {
-      const hashedPassword = await bcrypt.hash('password123', 10);
+      const initialPassword = process.env.MERCHANT_INITIAL_PASSWORD;
+      if (!initialPassword || initialPassword.length < 12) {
+        throw new Error('MERCHANT_INITIAL_PASSWORD must be set and contain at least 12 characters');
+      }
+      const hashedPassword = await bcrypt.hash(initialPassword, 10);
       
       await db.execute(sql`
         INSERT INTO users (email, password, name, role)
@@ -183,3 +187,4 @@ async function initDatabase() {
 }
 
 initDatabase();
+
