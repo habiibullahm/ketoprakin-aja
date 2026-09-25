@@ -10,6 +10,7 @@ import { verify } from "jsonwebtoken"
 import { normalizeIndonesianWhatsAppNumber } from "../lib/phone"
 import { getOrderNotifier } from "../lib/notifier"
 import { aggregateInventoryRequirements, type InventoryRequirement } from "../lib/inventory"
+import { jwtSecret } from "../config"
 
 const orderRoutes = new Hono()
 
@@ -24,12 +25,12 @@ const orderItemSchema = z.object({
 })
 
 const createOrderSchema = z.object({
-  customerName: z.string().min(2),
-  customerPhone: z.string().optional(),
+  customerName: z.string().min(2).max(255),
+  customerPhone: z.string().max(20).optional(),
   orderType: z.enum(["dine-in", "pickup"]),
   paymentMethod: z.literal("qris"),
-  items: z.array(orderItemSchema).min(1),
-  notes: z.string().optional(),
+  items: z.array(orderItemSchema).min(1).max(50),
+  notes: z.string().max(1000).optional(),
 })
 
 const guestOrderSchema = createOrderSchema.omit({ customerPhone: true }).extend({
@@ -194,7 +195,7 @@ const publicOrder = (order: any) => ({
 async function optionalCustomer(authHeader?: string) {
   if (!authHeader?.startsWith("Bearer ")) return null
   try {
-    const decoded = verify(authHeader.slice(7), process.env.JWT_SECRET!) as { userId: number }
+    const decoded = verify(authHeader.slice(7), jwtSecret) as unknown as { userId: number }
     const user = await db.query.users.findFirst({ where: eq(users.id, decoded.userId) })
     return user?.role === "customer" ? user : null
   } catch {
@@ -571,3 +572,4 @@ orderRoutes.patch("/:id/payment", merchantMiddleware, async (c) => {
 })
 
 export { orderRoutes }
+
