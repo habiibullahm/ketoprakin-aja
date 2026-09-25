@@ -28,6 +28,7 @@ services:
     command: npm run db:init
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ketoprakin_aja}
+      MERCHANT_INITIAL_PASSWORD: ${MERCHANT_INITIAL_PASSWORD:?Set MERCHANT_INITIAL_PASSWORD in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,7 +46,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ketoprakin_aja}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       NOTIFICATION_PROVIDER: ${NOTIFICATION_PROVIDER:-none}
     ports:
@@ -54,7 +55,7 @@ services:
       db-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -89,3 +90,4 @@ volumes:
 networks:
   ketoprakin-network:
     driver: bridge
+

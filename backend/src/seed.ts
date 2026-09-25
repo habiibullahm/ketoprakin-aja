@@ -6,7 +6,11 @@ async function seed() {
   console.log("🌱 Seeding database...")
 
   // Create default merchant user
-  const hashedPassword = await hash("password123", 10)
+  const initialPassword = process.env.MERCHANT_INITIAL_PASSWORD
+  if (!initialPassword || initialPassword.length < 12) {
+    throw new Error("MERCHANT_INITIAL_PASSWORD must be set and contain at least 12 characters")
+  }
+  const hashedPassword = await hash(initialPassword, 10)
   
   try {
     const [merchant] = await db
@@ -115,3 +119,4 @@ seed().catch((error) => {
   console.error("❌ Seeding failed:", error)
   process.exit(1)
 })
+
